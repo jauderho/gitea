@@ -55,7 +55,7 @@ github.com/ProtonMail/go-crypto/openpgp/internal/ecc
 github.com/ProtonMail/go-crypto/openpgp/internal/encoding
 github.com/ProtonMail/go-crypto/openpgp/packet
 github.com/ProtonMail/go-crypto/openpgp/s2k
-# github.com/PuerkitoBio/goquery v1.7.0
+# github.com/PuerkitoBio/goquery v1.7.1
 ## explicit
 github.com/PuerkitoBio/goquery
 # github.com/PuerkitoBio/purell v1.1.1
@@ -105,7 +105,6 @@ github.com/alecthomas/chroma/styles
 ## explicit
 github.com/andybalholm/brotli
 # github.com/andybalholm/cascadia v1.2.0
-## explicit
 github.com/andybalholm/cascadia
 # github.com/anmitsu/go-shlex v0.0.0-20200514113438-38f4b401e2be
 github.com/anmitsu/go-shlex

@@ -18,7 +18,7 @@ gitea.com/go-chi/cache/memcache
 # gitea.com/go-chi/captcha v0.0.0-20210110083842-e7696c336a1e
 ## explicit
 gitea.com/go-chi/captcha
-# gitea.com/go-chi/session v0.0.0-20210108030337-0cb48c5ba8ee
+# gitea.com/go-chi/session v0.0.0-20210913064732-2ac132b0fa07
 ## explicit
 gitea.com/go-chi/session
 gitea.com/go-chi/session/couchbase
@@ -952,7 +952,7 @@ golang.org/x/text/width
 # golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6
 ## explicit
 golang.org/x/time/rate
-# golang.org/x/tools v0.1.0
+# golang.org/x/tools v0.1.6
 ## explicit
 golang.org/x/tools/cover
 golang.org/x/tools/go/analysis
@@ -980,6 +980,7 @@ golang.org/x/tools/internal/gopathwalk
 golang.org/x/tools/internal/imports
 golang.org/x/tools/internal/lsp/fuzzy
 golang.org/x/tools/internal/packagesinternal
+golang.org/x/tools/internal/typeparams
 golang.org/x/tools/internal/typesinternal
 # golang.org/x/xerrors v0.0.0-20200804184101-5ec99f83aff1
 golang.org/x/xerrors
@@ -1052,7 +1053,7 @@ strk.kbt.io/projects/go/libravatar
 # xorm.io/builder v0.3.9
 ## explicit
 xorm.io/builder
-# xorm.io/xorm v1.2.2
+# xorm.io/xorm v1.2.4
 ## explicit
 xorm.io/xorm
 xorm.io/xorm/caches

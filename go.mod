@@ -54,7 +54,7 @@ require (
 	github.com/golang-jwt/jwt v3.2.2+incompatible
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-github/v39 v39.2.0
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/feeds v1.1.1
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/sessions v1.2.1

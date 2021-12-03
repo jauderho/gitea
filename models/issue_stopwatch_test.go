@@ -7,8 +7,8 @@ package models
 import (
 	"testing"
 
-	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/unittest"
+	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/timeutil"
 
 	"github.com/stretchr/testify/assert"
@@ -17,7 +17,7 @@ import (
 func TestCancelStopwatch(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
 
-	user1, err := GetUserByID(1)
+	user1, err := user_model.GetUserByID(1)
 	assert.NoError(t, err)
 
 	issue1, err := GetIssueByID(1)
@@ -27,9 +27,9 @@ func TestCancelStopwatch(t *testing.T) {
 
 	err = CancelStopwatch(user1, issue1)
 	assert.NoError(t, err)
-	db.AssertNotExistsBean(t, &Stopwatch{UserID: user1.ID, IssueID: issue1.ID})
+	unittest.AssertNotExistsBean(t, &Stopwatch{UserID: user1.ID, IssueID: issue1.ID})
 
-	_ = db.AssertExistsAndLoadBean(t, &Comment{Type: CommentTypeCancelTracking, PosterID: user1.ID, IssueID: issue1.ID})
+	_ = unittest.AssertExistsAndLoadBean(t, &Comment{Type: CommentTypeCancelTracking, PosterID: user1.ID, IssueID: issue1.ID})
 
 	assert.Nil(t, CancelStopwatch(user1, issue2))
 }
@@ -57,9 +57,9 @@ func TestHasUserStopwatch(t *testing.T) {
 func TestCreateOrStopIssueStopwatch(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
 
-	user2, err := GetUserByID(2)
+	user2, err := user_model.GetUserByID(2)
 	assert.NoError(t, err)
-	user3, err := GetUserByID(3)
+	user3, err := user_model.GetUserByID(3)
 	assert.NoError(t, err)
 
 	issue1, err := GetIssueByID(1)
@@ -68,10 +68,10 @@ func TestCreateOrStopIssueStopwatch(t *testing.T) {
 	assert.NoError(t, err)
 
 	assert.NoError(t, CreateOrStopIssueStopwatch(user3, issue1))
-	sw := db.AssertExistsAndLoadBean(t, &Stopwatch{UserID: 3, IssueID: 1}).(*Stopwatch)
+	sw := unittest.AssertExistsAndLoadBean(t, &Stopwatch{UserID: 3, IssueID: 1}).(*Stopwatch)
 	assert.LessOrEqual(t, sw.CreatedUnix, timeutil.TimeStampNow())
 
 	assert.NoError(t, CreateOrStopIssueStopwatch(user2, issue2))
-	db.AssertNotExistsBean(t, &Stopwatch{UserID: 2, IssueID: 2})
-	db.AssertExistsAndLoadBean(t, &TrackedTime{UserID: 2, IssueID: 2})
+	unittest.AssertNotExistsBean(t, &Stopwatch{UserID: 2, IssueID: 2})
+	unittest.AssertExistsAndLoadBean(t, &TrackedTime{UserID: 2, IssueID: 2})
 }

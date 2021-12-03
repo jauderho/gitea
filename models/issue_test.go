@@ -13,6 +13,8 @@ import (
 
 	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/unittest"
+	user_model "code.gitea.io/gitea/models/user"
+
 	"github.com/stretchr/testify/assert"
 )
 
@@ -20,18 +22,18 @@ func TestIssue_ReplaceLabels(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
 
 	testSuccess := func(issueID int64, labelIDs []int64) {
-		issue := db.AssertExistsAndLoadBean(t, &Issue{ID: issueID}).(*Issue)
-		repo := db.AssertExistsAndLoadBean(t, &Repository{ID: issue.RepoID}).(*Repository)
-		doer := db.AssertExistsAndLoadBean(t, &User{ID: repo.OwnerID}).(*User)
+		issue := unittest.AssertExistsAndLoadBean(t, &Issue{ID: issueID}).(*Issue)
+		repo := unittest.AssertExistsAndLoadBean(t, &Repository{ID: issue.RepoID}).(*Repository)
+		doer := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: repo.OwnerID}).(*user_model.User)
 
 		labels := make([]*Label, len(labelIDs))
 		for i, labelID := range labelIDs {
-			labels[i] = db.AssertExistsAndLoadBean(t, &Label{ID: labelID, RepoID: repo.ID}).(*Label)
+			labels[i] = unittest.AssertExistsAndLoadBean(t, &Label{ID: labelID, RepoID: repo.ID}).(*Label)
 		}
 		assert.NoError(t, issue.ReplaceLabels(labels, doer))
-		db.AssertCount(t, &IssueLabel{IssueID: issueID}, len(labelIDs))
+		unittest.AssertCount(t, &IssueLabel{IssueID: issueID}, len(labelIDs))
 		for _, labelID := range labelIDs {
-			db.AssertExistsAndLoadBean(t, &IssueLabel{IssueID: issueID, LabelID: labelID})
+			unittest.AssertExistsAndLoadBean(t, &IssueLabel{IssueID: issueID, LabelID: labelID})
 		}
 	}
 
@@ -50,7 +52,7 @@ func Test_GetIssueIDsByRepoID(t *testing.T) {
 
 func TestIssueAPIURL(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
-	issue := db.AssertExistsAndLoadBean(t, &Issue{ID: 1}).(*Issue)
+	issue := unittest.AssertExistsAndLoadBean(t, &Issue{ID: 1}).(*Issue)
 	err := issue.LoadAttributes()
 
 	assert.NoError(t, err)
@@ -69,7 +71,7 @@ func TestGetIssuesByIDs(t *testing.T) {
 		assert.Equal(t, expectedIssueIDs, actualIssueIDs)
 	}
 	testSuccess([]int64{1, 2, 3}, []int64{})
-	testSuccess([]int64{1, 2, 3}, []int64{db.NonexistentID})
+	testSuccess([]int64{1, 2, 3}, []int64{unittest.NonexistentID})
 }
 
 func TestGetParticipantIDsByIssue(t *testing.T) {
@@ -108,16 +110,16 @@ func TestIssue_ClearLabels(t *testing.T) {
 	}
 	for _, test := range tests {
 		assert.NoError(t, unittest.PrepareTestDatabase())
-		issue := db.AssertExistsAndLoadBean(t, &Issue{ID: test.issueID}).(*Issue)
-		doer := db.AssertExistsAndLoadBean(t, &User{ID: test.doerID}).(*User)
+		issue := unittest.AssertExistsAndLoadBean(t, &Issue{ID: test.issueID}).(*Issue)
+		doer := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: test.doerID}).(*user_model.User)
 		assert.NoError(t, issue.ClearLabels(doer))
-		db.AssertNotExistsBean(t, &IssueLabel{IssueID: test.issueID})
+		unittest.AssertNotExistsBean(t, &IssueLabel{IssueID: test.issueID})
 	}
 }
 
 func TestUpdateIssueCols(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
-	issue := db.AssertExistsAndLoadBean(t, &Issue{}).(*Issue)
+	issue := unittest.AssertExistsAndLoadBean(t, &Issue{}).(*Issue)
 
 	const newTitle = "New Title for unit test"
 	issue.Title = newTitle
@@ -129,10 +131,10 @@ func TestUpdateIssueCols(t *testing.T) {
 	assert.NoError(t, updateIssueCols(db.GetEngine(db.DefaultContext), issue, "name"))
 	then := time.Now().Unix()
 
-	updatedIssue := db.AssertExistsAndLoadBean(t, &Issue{ID: issue.ID}).(*Issue)
+	updatedIssue := unittest.AssertExistsAndLoadBean(t, &Issue{ID: issue.ID}).(*Issue)
 	assert.EqualValues(t, newTitle, updatedIssue.Title)
 	assert.EqualValues(t, prevContent, updatedIssue.Content)
-	db.AssertInt64InRange(t, now, then, int64(updatedIssue.UpdatedUnix))
+	unittest.AssertInt64InRange(t, now, then, int64(updatedIssue.UpdatedUnix))
 }
 
 func TestIssues(t *testing.T) {
@@ -321,7 +323,7 @@ func TestIssue_SearchIssueIDsByKeyword(t *testing.T) {
 
 func TestGetRepoIDsForIssuesOptions(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
-	user := db.AssertExistsAndLoadBean(t, &User{ID: 2}).(*User)
+	user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2}).(*user_model.User)
 	for _, test := range []struct {
 		Opts            IssuesOptions
 		ExpectedRepoIDs []int64
@@ -352,8 +354,8 @@ func TestGetRepoIDsForIssuesOptions(t *testing.T) {
 func testInsertIssue(t *testing.T, title, content string, expectIndex int64) *Issue {
 	var newIssue Issue
 	t.Run(title, func(t *testing.T) {
-		repo := db.AssertExistsAndLoadBean(t, &Repository{ID: 1}).(*Repository)
-		user := db.AssertExistsAndLoadBean(t, &User{ID: 2}).(*User)
+		repo := unittest.AssertExistsAndLoadBean(t, &Repository{ID: 1}).(*Repository)
+		user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2}).(*user_model.User)
 
 		issue := Issue{
 			RepoID:   repo.ID,
@@ -395,10 +397,10 @@ func TestIssue_ResolveMentions(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
 
 	testSuccess := func(owner, repo, doer string, mentions []string, expected []int64) {
-		o := db.AssertExistsAndLoadBean(t, &User{LowerName: owner}).(*User)
-		r := db.AssertExistsAndLoadBean(t, &Repository{OwnerID: o.ID, LowerName: repo}).(*Repository)
+		o := unittest.AssertExistsAndLoadBean(t, &user_model.User{LowerName: owner}).(*user_model.User)
+		r := unittest.AssertExistsAndLoadBean(t, &Repository{OwnerID: o.ID, LowerName: repo}).(*Repository)
 		issue := &Issue{RepoID: r.ID}
-		d := db.AssertExistsAndLoadBean(t, &User{LowerName: doer}).(*User)
+		d := unittest.AssertExistsAndLoadBean(t, &user_model.User{LowerName: doer}).(*user_model.User)
 		resolved, err := issue.ResolveMentionsByVisibility(db.DefaultContext, d, mentions)
 		assert.NoError(t, err)
 		ids := make([]int64, len(resolved))

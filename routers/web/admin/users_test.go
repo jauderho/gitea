@@ -7,9 +7,8 @@ package admin
 import (
 	"testing"
 
-	"code.gitea.io/gitea/models"
-	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/unittest"
+	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/setting"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/test"
@@ -24,10 +23,10 @@ func TestNewUserPost_MustChangePassword(t *testing.T) {
 	unittest.PrepareTestEnv(t)
 	ctx := test.MockContext(t, "admin/users/new")
 
-	u := db.AssertExistsAndLoadBean(t, &models.User{
+	u := unittest.AssertExistsAndLoadBean(t, &user_model.User{
 		IsAdmin: true,
 		ID:      2,
-	}).(*models.User)
+	}).(*user_model.User)
 
 	ctx.User = u
 
@@ -49,7 +48,7 @@ func TestNewUserPost_MustChangePassword(t *testing.T) {
 
 	assert.NotEmpty(t, ctx.Flash.SuccessMsg)
 
-	u, err := models.GetUserByName(username)
+	u, err := user_model.GetUserByName(username)
 
 	assert.NoError(t, err)
 	assert.Equal(t, username, u.Name)
@@ -61,10 +60,10 @@ func TestNewUserPost_MustChangePasswordFalse(t *testing.T) {
 	unittest.PrepareTestEnv(t)
 	ctx := test.MockContext(t, "admin/users/new")
 
-	u := db.AssertExistsAndLoadBean(t, &models.User{
+	u := unittest.AssertExistsAndLoadBean(t, &user_model.User{
 		IsAdmin: true,
 		ID:      2,
-	}).(*models.User)
+	}).(*user_model.User)
 
 	ctx.User = u
 
@@ -86,7 +85,7 @@ func TestNewUserPost_MustChangePasswordFalse(t *testing.T) {
 
 	assert.NotEmpty(t, ctx.Flash.SuccessMsg)
 
-	u, err := models.GetUserByName(username)
+	u, err := user_model.GetUserByName(username)
 
 	assert.NoError(t, err)
 	assert.Equal(t, username, u.Name)
@@ -98,10 +97,10 @@ func TestNewUserPost_InvalidEmail(t *testing.T) {
 	unittest.PrepareTestEnv(t)
 	ctx := test.MockContext(t, "admin/users/new")
 
-	u := db.AssertExistsAndLoadBean(t, &models.User{
+	u := unittest.AssertExistsAndLoadBean(t, &user_model.User{
 		IsAdmin: true,
 		ID:      2,
-	}).(*models.User)
+	}).(*user_model.User)
 
 	ctx.User = u
 
@@ -128,10 +127,10 @@ func TestNewUserPost_VisibilityDefaultPublic(t *testing.T) {
 	unittest.PrepareTestEnv(t)
 	ctx := test.MockContext(t, "admin/users/new")
 
-	u := db.AssertExistsAndLoadBean(t, &models.User{
+	u := unittest.AssertExistsAndLoadBean(t, &user_model.User{
 		IsAdmin: true,
 		ID:      2,
-	}).(*models.User)
+	}).(*user_model.User)
 
 	ctx.User = u
 
@@ -153,7 +152,7 @@ func TestNewUserPost_VisibilityDefaultPublic(t *testing.T) {
 
 	assert.NotEmpty(t, ctx.Flash.SuccessMsg)
 
-	u, err := models.GetUserByName(username)
+	u, err := user_model.GetUserByName(username)
 
 	assert.NoError(t, err)
 	assert.Equal(t, username, u.Name)
@@ -166,10 +165,10 @@ func TestNewUserPost_VisibilityPrivate(t *testing.T) {
 	unittest.PrepareTestEnv(t)
 	ctx := test.MockContext(t, "admin/users/new")
 
-	u := db.AssertExistsAndLoadBean(t, &models.User{
+	u := unittest.AssertExistsAndLoadBean(t, &user_model.User{
 		IsAdmin: true,
 		ID:      2,
-	}).(*models.User)
+	}).(*user_model.User)
 
 	ctx.User = u
 
@@ -192,7 +191,7 @@ func TestNewUserPost_VisibilityPrivate(t *testing.T) {
 
 	assert.NotEmpty(t, ctx.Flash.SuccessMsg)
 
-	u, err := models.GetUserByName(username)
+	u, err := user_model.GetUserByName(username)
 
 	assert.NoError(t, err)
 	assert.Equal(t, username, u.Name)

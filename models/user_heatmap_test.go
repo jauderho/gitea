@@ -9,8 +9,8 @@ import (
 	"testing"
 	"time"
 
-	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/unittest"
+	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/json"
 	"code.gitea.io/gitea/modules/timeutil"
 
@@ -47,10 +47,10 @@ func TestGetUserHeatmapDataByUser(t *testing.T) {
 	defer timeutil.Unset()
 
 	for i, tc := range testCases {
-		user := db.AssertExistsAndLoadBean(t, &User{ID: tc.userID}).(*User)
+		user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: tc.userID}).(*user_model.User)
 
-		doer := &User{ID: tc.doerID}
-		_, err := db.LoadBeanIfExists(doer)
+		doer := &user_model.User{ID: tc.doerID}
+		_, err := unittest.LoadBeanIfExists(doer)
 		assert.NoError(t, err)
 		if tc.doerID == 0 {
 			doer = nil

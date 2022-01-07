@@ -57,7 +57,7 @@
     "stylelint": "14.1.0",
     "stylelint-config-standard": "24.0.0",
     "svgo": "2.8.0",
-    "updates": "12.2.2"
+    "updates": "13.0.0"
   },
   "browserslist": [
     "defaults",

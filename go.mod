@@ -16,7 +16,7 @@ require (
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ProtonMail/go-crypto v0.0.0-20210705153151-cc34b1f6908b // indirect
 	github.com/PuerkitoBio/goquery v1.7.0
-	github.com/alecthomas/chroma v0.9.4
+	github.com/alecthomas/chroma v0.10.0
 	github.com/andybalholm/brotli v1.0.3 // indirect
 	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/blevesearch/bleve/v2 v2.3.0
@@ -30,6 +30,7 @@ require (
 	github.com/denisenkom/go-mssqldb v0.10.0
 	github.com/djherbis/buffer v1.2.0
 	github.com/djherbis/nio/v3 v3.0.1
+	github.com/duo-labs/webauthn v0.0.0-20220122034320-81aea484c951
 	github.com/dustin/go-humanize v1.0.0
 	github.com/editorconfig/editorconfig-core-go/v2 v2.4.2
 	github.com/emirpasic/gods v1.12.0
@@ -50,10 +51,10 @@ require (
 	github.com/gogs/chardet v0.0.0-20191104214054-4b6791f73a28
 	github.com/gogs/cron v0.0.0-20171120032916-9f6c956d3e14
 	github.com/gogs/go-gogs-client v0.0.0-20210131175652-1d7215cd8d85
-	github.com/golang-jwt/jwt v3.2.2+incompatible
+	github.com/golang-jwt/jwt/v4 v4.2.0
 	github.com/golang/snappy v0.0.4 // indirect
 	github.com/google/go-github/v39 v39.2.0
-	github.com/google/uuid v1.2.0
+	github.com/google/uuid v1.3.0
 	github.com/gorilla/feeds v1.1.1
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/sessions v1.2.1
@@ -96,6 +97,7 @@ require (
 	github.com/quasoft/websspi v1.0.0
 	github.com/rs/xid v1.3.0 // indirect
 	github.com/russross/blackfriday/v2 v2.1.0 // indirect
+	github.com/santhosh-tekuri/jsonschema/v5 v5.0.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
 	github.com/shurcooL/vfsgen v0.0.0-20200824052919-0d455de96546
@@ -111,7 +113,7 @@ require (
 	github.com/urfave/cli v1.22.5
 	github.com/xanzy/go-gitlab v0.50.1
 	github.com/yohcop/openid-go v1.0.0
-	github.com/yuin/goldmark v1.4.0
+	github.com/yuin/goldmark v1.4.4
 	github.com/yuin/goldmark-highlighting v0.0.0-20210516132338-9216f9c5aa01
 	github.com/yuin/goldmark-meta v1.0.0
 	go.etcd.io/bbolt v1.3.6 // indirect
@@ -140,6 +142,14 @@ require (
 
 replace github.com/hashicorp/go-version => github.com/6543/go-version v1.3.1
 
-replace github.com/golang-jwt/jwt v3.2.1+incompatible => github.com/golang-jwt/jwt v3.2.2+incompatible
+replace github.com/markbates/goth v1.68.0 => github.com/zeripath/goth v1.68.1-0.20220109111530-754359885dce
 
 replace github.com/shurcooL/vfsgen => github.com/lunny/vfsgen v0.0.0-20220105142115-2c99e1ffdfa0
+
+replace github.com/satori/go.uuid v1.2.0 => github.com/gofrs/uuid v4.2.0+incompatible
+
+exclude github.com/gofrs/uuid v3.2.0+incompatible
+
+exclude github.com/gofrs/uuid v4.0.0+incompatible
+
+exclude github.com/goccy/go-json v0.4.11

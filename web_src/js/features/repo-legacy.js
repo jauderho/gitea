@@ -1,3 +1,4 @@
+import $ from 'jquery';
 import {createCommentEasyMDE, getAttachedEasyMDE} from './comp/EasyMDE.js';
 import {initCompMarkupContentPreviewTab} from './comp/MarkupContentPreview.js';
 import {initCompImagePaste, initEasyMDEImagePaste} from './comp/ImagePaste.js';
@@ -64,10 +65,13 @@ export function initRepoCommentForm() {
     });
   }
 
-  createCommentEasyMDE($('.comment.form textarea:not(.review-textarea)'));
+  (async () => {
+    await createCommentEasyMDE($('.comment.form textarea:not(.review-textarea)'));
+    initCompImagePaste($('.comment.form'));
+  })();
+
   initBranchSelector();
   initCompMarkupContentPreviewTab($('.comment.form'));
-  initCompImagePaste($('.comment.form'));
 
   // List submits
   function initListSubmits(selector, outerSelector) {

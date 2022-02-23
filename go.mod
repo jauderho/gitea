@@ -15,10 +15,9 @@ require (
 	github.com/Microsoft/go-winio v0.5.0 // indirect
 	github.com/NYTimes/gziphandler v1.1.1
 	github.com/ProtonMail/go-crypto v0.0.0-20210705153151-cc34b1f6908b // indirect
-	github.com/PuerkitoBio/goquery v1.7.0
+	github.com/PuerkitoBio/goquery v1.8.0
 	github.com/alecthomas/chroma v0.10.0
 	github.com/andybalholm/brotli v1.0.3 // indirect
-	github.com/andybalholm/cascadia v1.2.0 // indirect
 	github.com/blevesearch/bleve/v2 v2.3.0
 	github.com/boombuler/barcode v1.0.1 // indirect
 	github.com/bradfitz/gomemcache v0.0.0-20190913173617-a41fca850d0b // indirect

@@ -412,7 +412,7 @@ export function initRepoPullRequestReview() {
       // get the name of the parent id
       const groupID = commentDiv.closest('div[id^="code-comments-"]').attr('id');
       if (groupID && groupID.startsWith('code-comments-')) {
-        const id = groupID.substr(14);
+        const id = groupID.slice(14);
         $(`#show-outdated-${id}`).addClass('hide');
         $(`#code-comments-${id}`).removeClass('hide');
         $(`#code-preview-${id}`).removeClass('hide');
@@ -505,7 +505,9 @@ export function initRepoPullRequestReview() {
             <td class="lines-type-marker"></td>
             <td class="add-comment-right"></td>
           ` : `
-            <td colspan="3" class="lines-num"></td>
+            <td class="lines-num"></td>
+            <td class="lines-num"></td>
+            <td class="lines-escape"></td>
             <td class="add-comment-left add-comment-right" colspan="2"></td>
           `}
         </tr>`);
@@ -558,7 +560,7 @@ export function initRepoIssueWipToggle() {
     const updateUrl = toggleWip.getAttribute('data-update-url');
     await $.post(updateUrl, {
       _csrf: csrfToken,
-      title: title?.startsWith(wipPrefix) ? title.substr(wipPrefix.length).trim() : `${wipPrefix.trim()} ${title}`,
+      title: title?.startsWith(wipPrefix) ? title.slice(wipPrefix.length).trim() : `${wipPrefix.trim()} ${title}`,
     });
     window.location.reload();
   });

@@ -3,7 +3,6 @@ module code.gitea.io/gitea
 go 1.16
 
 require (
-	cloud.google.com/go v0.78.0 // indirect
 	code.gitea.io/gitea-vet v0.2.2-0.20220122151748-48ebc902541b
 	code.gitea.io/sdk/gitea v0.15.1
 	gitea.com/go-chi/binding v0.0.0-20211013065440-d16dc407c2be
@@ -45,7 +44,7 @@ require (
 	github.com/go-ldap/ldap/v3 v3.3.0
 	github.com/go-redis/redis/v8 v8.11.0
 	github.com/go-sql-driver/mysql v1.6.0
-	github.com/go-swagger/go-swagger v0.27.0
+	github.com/go-swagger/go-swagger v0.29.0
 	github.com/go-testfixtures/testfixtures/v3 v3.6.1
 	github.com/gobwas/glob v0.2.3
 	github.com/gogs/chardet v0.0.0-20191104214054-4b6791f73a28
@@ -58,7 +57,6 @@ require (
 	github.com/gorilla/feeds v1.1.1
 	github.com/gorilla/mux v1.8.0 // indirect
 	github.com/gorilla/sessions v1.2.1
-	github.com/hashicorp/go-cleanhttp v0.5.2 // indirect
 	github.com/hashicorp/go-retryablehttp v0.7.0 // indirect
 	github.com/hashicorp/go-version v1.3.1
 	github.com/hashicorp/golang-lru v0.5.4
@@ -68,13 +66,13 @@ require (
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/kevinburke/ssh_config v1.1.0 // indirect
 	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4
-	github.com/klauspost/compress v1.13.1
+	github.com/klauspost/compress v1.13.6
 	github.com/klauspost/cpuid/v2 v2.0.9
 	github.com/klauspost/pgzip v1.2.5 // indirect
 	github.com/lib/pq v1.10.2
 	github.com/lunny/dingtalk_webhook v0.0.0-20171025031554-e3534c89ef96
 	github.com/markbates/goth v1.68.0
-	github.com/mattn/go-isatty v0.0.13
+	github.com/mattn/go-isatty v0.0.14
 	github.com/mattn/go-runewidth v0.0.13 // indirect
 	github.com/mattn/go-sqlite3 v1.14.8
 	github.com/mholt/archiver/v3 v3.5.0
@@ -89,14 +87,12 @@ require (
 	github.com/olekukonko/tablewriter v0.0.5 // indirect
 	github.com/oliamb/cutter v0.2.2
 	github.com/olivere/elastic/v7 v7.0.25
-	github.com/pelletier/go-toml v1.9.0 // indirect
 	github.com/pierrec/lz4/v4 v4.1.8 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/pquerna/otp v1.3.0
 	github.com/prometheus/client_golang v1.11.0
 	github.com/quasoft/websspi v1.0.0
 	github.com/rs/xid v1.3.0 // indirect
-	github.com/russross/blackfriday/v2 v2.1.0 // indirect
 	github.com/santhosh-tekuri/jsonschema/v5 v5.0.0
 	github.com/sergi/go-diff v1.2.0
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
@@ -122,17 +118,16 @@ require (
 	go.uber.org/atomic v1.9.0 // indirect
 	go.uber.org/multierr v1.7.0 // indirect
 	go.uber.org/zap v1.19.0 // indirect
-	golang.org/x/crypto v0.0.0-20211117183948-ae814b36b871
+	golang.org/x/crypto v0.0.0-20220112180741-5e0467b6c7ce
 	golang.org/x/net v0.0.0-20220127200216-cd36cc0744dd
-	golang.org/x/oauth2 v0.0.0-20210628180205-a41e5a781914
-	golang.org/x/sys v0.0.0-20211216021012-1d35b9e2eb4e
+	golang.org/x/oauth2 v0.0.0-20211104180415-d3ed0bb246c8
+	golang.org/x/sys v0.0.0-20220114195835-da31bd327af9
 	golang.org/x/text v0.3.7
 	golang.org/x/time v0.0.0-20210611083556-38a9dc6acbc6 // indirect
-	golang.org/x/tools v0.1.0
-	google.golang.org/protobuf v1.27.1 // indirect
+	golang.org/x/tools v0.1.8
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
-	gopkg.in/ini.v1 v1.62.0
+	gopkg.in/ini.v1 v1.66.3
 	gopkg.in/yaml.v2 v2.4.0
 	mvdan.cc/xurls/v2 v2.2.0
 	strk.kbt.io/projects/go/libravatar v0.0.0-20191008002943-06d1c002b251

@@ -39,7 +39,7 @@ require (
 	github.com/go-asn1-ber/asn1-ber v1.5.3 // indirect
 	github.com/go-chi/chi/v5 v5.0.4
 	github.com/go-chi/cors v1.2.0
-	github.com/go-enry/go-enry/v2 v2.7.1
+	github.com/go-enry/go-enry/v2 v2.8.0
 	github.com/go-git/go-billy/v5 v5.3.1
 	github.com/go-git/go-git/v5 v5.4.3-0.20210630082519-b4368b2a2ca4
 	github.com/go-ldap/ldap/v3 v3.3.0
@@ -134,7 +134,7 @@ require (
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/ini.v1 v1.62.0
 	gopkg.in/yaml.v2 v2.4.0
-	mvdan.cc/xurls/v2 v2.2.0
+	mvdan.cc/xurls/v2 v2.4.0
 	strk.kbt.io/projects/go/libravatar v0.0.0-20191008002943-06d1c002b251
 	xorm.io/builder v0.3.9
 	xorm.io/xorm v1.2.5

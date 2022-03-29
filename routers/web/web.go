@@ -29,12 +29,14 @@ import (
 	"code.gitea.io/gitea/routers/web/dev"
 	"code.gitea.io/gitea/routers/web/events"
 	"code.gitea.io/gitea/routers/web/explore"
+	"code.gitea.io/gitea/routers/web/feed"
 	"code.gitea.io/gitea/routers/web/org"
 	"code.gitea.io/gitea/routers/web/repo"
 	"code.gitea.io/gitea/routers/web/user"
 	user_setting "code.gitea.io/gitea/routers/web/user/setting"
 	"code.gitea.io/gitea/routers/web/user/setting/security"
 	auth_service "code.gitea.io/gitea/services/auth"
+	context_service "code.gitea.io/gitea/services/context"
 	"code.gitea.io/gitea/services/forms"
 	"code.gitea.io/gitea/services/lfs"
 	"code.gitea.io/gitea/services/mailer"
@@ -69,6 +71,26 @@ func CorsHandler() func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return next
 	}
+}
+
+// The OAuth2 plugin is expected to be executed first, as it must ignore the user id stored
+// in the session (if there is a user id stored in session other plugins might return the user
+// object for that id).
+//
+// The Session plugin is expected to be executed second, in order to skip authentication
+// for users that have already signed in.
+func buildAuthGroup() *auth_service.Group {
+	group := auth_service.NewGroup(
+		&auth_service.OAuth2{}, // FIXME: this should be removed and only applied in download and oauth realted routers
+		&auth_service.Basic{},  // FIXME: this should be removed and only applied in download and git/lfs routers
+		auth_service.SharedSession,
+	)
+	if setting.Service.EnableReverseProxyAuth {
+		group.Add(&auth_service.ReverseProxy{})
+	}
+	specialAdd(group)
+
+	return group
 }
 
 // Routes returns all web routes
@@ -158,8 +180,13 @@ func Routes(sessioner func(http.Handler) http.Handler) *web.Route {
 	// Removed: toolbox.Toolboxer middleware will provide debug information which seems unnecessary
 	common = append(common, context.Contexter())
 
+	group := buildAuthGroup()
+	if err := group.Init(); err != nil {
+		log.Error("Could not initialize '%s' auth method, error: %s", group.Name(), err)
+	}
+
 	// Get user from session if logged in.
-	common = append(common, context.Auth(auth_service.NewGroup(auth_service.Methods()...)))
+	common = append(common, context.Auth(group))
 
 	// GetHead allows a HEAD request redirect to GET if HEAD method is not defined for that route
 	common = append(common, middleware.GetHead)
@@ -496,11 +523,21 @@ func RegisterRoutes(m *web.Route) {
 	// ***** END: Admin *****
 
 	m.Group("", func() {
-		m.Get("/{username}", user.Profile)
+		m.Get("/favicon.ico", func(ctx *context.Context) {
+			ctx.ServeFile(path.Join(setting.StaticRootPath, "public/img/favicon.png"))
+		})
+		m.Group("/{username}", func() {
+			m.Get(".png", func(ctx *context.Context) { ctx.Error(http.StatusNotFound) })
+			m.Get(".keys", user.ShowSSHKeys)
+			m.Get(".gpg", user.ShowGPGKeys)
+			m.Get(".rss", feed.ShowUserFeedRSS)
+			m.Get(".atom", feed.ShowUserFeedAtom)
+			m.Get("", user.Profile)
+		}, context_service.UserAssignmentWeb())
 		m.Get("/attachments/{uuid}", repo.GetAttachment)
 	}, ignSignIn)
 
-	m.Post("/{username}", reqSignIn, user.Action)
+	m.Post("/{username}", reqSignIn, context_service.UserAssignmentWeb(), user.Action)
 
 	if !setting.IsProd {
 		m.Get("/template/*", dev.TemplatePreview)
@@ -947,6 +984,7 @@ func RegisterRoutes(m *web.Route) {
 			m.Get("/commit/{sha:[a-f0-9]{7,40}}.{ext:patch|diff}", repo.RawDiff)
 		}, repo.MustEnableWiki, func(ctx *context.Context) {
 			ctx.Data["PageIsWiki"] = true
+			ctx.Data["CloneButtonOriginLink"] = ctx.Repo.Repository.WikiCloneLink()
 		})
 
 		m.Group("/wiki", func() {
@@ -1107,7 +1145,7 @@ func RegisterRoutes(m *web.Route) {
 				m.GetOptions("/objects/{head:[0-9a-f]{2}}/{hash:[0-9a-f]{38}}", repo.GetLooseObject)
 				m.GetOptions("/objects/pack/pack-{file:[0-9a-f]{40}}.pack", repo.GetPackFile)
 				m.GetOptions("/objects/pack/pack-{file:[0-9a-f]{40}}.idx", repo.GetIdxFile)
-			}, ignSignInAndCsrf)
+			}, ignSignInAndCsrf, context_service.UserAssignmentWeb())
 		})
 	})
 	// ***** END: Repository *****

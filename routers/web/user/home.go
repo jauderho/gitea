@@ -17,6 +17,7 @@ import (
 	"code.gitea.io/gitea/models"
 	asymkey_model "code.gitea.io/gitea/models/asymkey"
 	"code.gitea.io/gitea/models/db"
+	"code.gitea.io/gitea/models/organization"
 	repo_model "code.gitea.io/gitea/models/repo"
 	"code.gitea.io/gitea/models/unit"
 	user_model "code.gitea.io/gitea/models/user"
@@ -74,7 +75,7 @@ func Dashboard(ctx *context.Context) {
 	ctx.Data["Title"] = ctxUser.DisplayName() + " - " + ctx.Tr("dashboard")
 	ctx.Data["PageIsDashboard"] = true
 	ctx.Data["PageIsNews"] = true
-	cnt, _ := models.GetOrganizationCount(ctx, ctxUser)
+	cnt, _ := organization.GetOrganizationCount(ctx, ctxUser)
 	ctx.Data["UserOrgsCount"] = cnt
 
 	var uid int64
@@ -99,11 +100,11 @@ func Dashboard(ctx *context.Context) {
 	var err error
 	var mirrors []*repo_model.Repository
 	if ctxUser.IsOrganization() {
-		var env models.AccessibleReposEnvironment
+		var env organization.AccessibleReposEnvironment
 		if ctx.Org.Team != nil {
-			env = models.OrgFromUser(ctxUser).AccessibleTeamReposEnv(ctx.Org.Team)
+			env = organization.OrgFromUser(ctxUser).AccessibleTeamReposEnv(ctx.Org.Team)
 		} else {
-			env, err = models.OrgFromUser(ctxUser).AccessibleReposEnv(ctx.Doer.ID)
+			env, err = organization.AccessibleReposEnv(ctx, organization.OrgFromUser(ctxUser), ctx.Doer.ID)
 			if err != nil {
 				ctx.ServerError("AccessibleReposEnv", err)
 				return
@@ -362,7 +363,7 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 	var (
 		viewType   string
 		sortType   = ctx.FormString("sort")
-		filterMode = models.FilterModeAll
+		filterMode int
 	)
 
 	// --------------------------------------------------------------------------------
@@ -388,8 +389,10 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 		filterMode = models.FilterModeMention
 	case "review_requested":
 		filterMode = models.FilterModeReviewRequested
-	case "your_repositories": // filterMode already set to All
+	case "your_repositories":
+		fallthrough
 	default:
+		filterMode = models.FilterModeYourRepositories
 		viewType = "your_repositories"
 	}
 
@@ -402,8 +405,8 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 	// --------------------------------------------------------------------------
 
 	// Get repository IDs where User/Org/Team has access.
-	var team *models.Team
-	var org *models.Organization
+	var team *organization.Team
+	var org *organization.Organization
 	if ctx.Org != nil {
 		org = ctx.Org.Organization
 		team = ctx.Org.Team
@@ -419,6 +422,30 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 		User:       ctx.Doer,
 	}
 
+	// Search all repositories which
+	//
+	// As user:
+	// - Owns the repository.
+	// - Have collaborator permissions in repository.
+	//
+	// As org:
+	// - Owns the repository.
+	//
+	// As team:
+	// - Team org's owns the repository.
+	// - Team has read permission to repository.
+	repoOpts := &models.SearchRepoOptions{
+		Actor:      ctx.Doer,
+		OwnerID:    ctx.Doer.ID,
+		Private:    true,
+		AllPublic:  false,
+		AllLimited: false,
+	}
+
+	if ctxUser.IsOrganization() && ctx.Org.Team != nil {
+		repoOpts.TeamID = ctx.Org.Team.ID
+	}
+
 	switch filterMode {
 	case models.FilterModeAll:
 	case models.FilterModeAssign:
@@ -429,6 +456,19 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 		opts.MentionedID = ctx.Doer.ID
 	case models.FilterModeReviewRequested:
 		opts.ReviewRequestedID = ctx.Doer.ID
+	case models.FilterModeYourRepositories:
+		if ctxUser.IsOrganization() && ctx.Org.Team != nil {
+			// Fixes a issue whereby the user's ID would be used
+			// to check if it's in the team(which possible isn't the case).
+			opts.User = nil
+		}
+		userRepoIDs, _, err := models.SearchRepositoryIDs(repoOpts)
+		if err != nil {
+			ctx.ServerError("models.SearchRepositoryIDs: %v", err)
+			return
+		}
+
+		opts.RepoIDs = userRepoIDs
 	}
 
 	// keyword holds the search term entered into the search field.
@@ -560,8 +600,12 @@ func buildIssueOverview(ctx *context.Context, unitType unit.Type) {
 			Org:        org,
 			Team:       team,
 		}
-		if len(repoIDs) > 0 {
-			statsOpts.RepoIDs = repoIDs
+		if filterMode == models.FilterModeYourRepositories {
+			statsOpts.RepoCond = models.SearchRepositoryCondition(repoOpts)
+		}
+		// Detect when we only should search by team.
+		if opts.User == nil {
+			statsOpts.UserID = 0
 		}
 		issueStats, err = models.GetUserIssueStats(statsOpts)
 		if err != nil {
@@ -713,8 +757,8 @@ func loadRepoByIDs(ctxUser *user_model.User, issueCountByRepo map[int64]int64, u
 }
 
 // ShowSSHKeys output all the ssh keys of user by uid
-func ShowSSHKeys(ctx *context.Context, uid int64) {
-	keys, err := asymkey_model.ListPublicKeys(uid, db.ListOptions{})
+func ShowSSHKeys(ctx *context.Context) {
+	keys, err := asymkey_model.ListPublicKeys(ctx.ContextUser.ID, db.ListOptions{})
 	if err != nil {
 		ctx.ServerError("ListPublicKeys", err)
 		return
@@ -729,8 +773,8 @@ func ShowSSHKeys(ctx *context.Context, uid int64) {
 }
 
 // ShowGPGKeys output all the public GPG keys of user by uid
-func ShowGPGKeys(ctx *context.Context, uid int64) {
-	keys, err := asymkey_model.ListGPGKeys(ctx, uid, db.ListOptions{})
+func ShowGPGKeys(ctx *context.Context) {
+	keys, err := asymkey_model.ListGPGKeys(ctx, ctx.ContextUser.ID, db.ListOptions{})
 	if err != nil {
 		ctx.ServerError("ListGPGKeys", err)
 		return

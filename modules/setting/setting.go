@@ -27,7 +27,6 @@ import (
 	"code.gitea.io/gitea/modules/user"
 	"code.gitea.io/gitea/modules/util"
 
-	"github.com/unknwon/com"
 	gossh "golang.org/x/crypto/ssh"
 	ini "gopkg.in/ini.v1"
 )
@@ -212,6 +211,7 @@ var (
 		MembersPagingNum      int
 		FeedMaxCommitNum      int
 		FeedPagingNum         int
+		PackagesPagingNum     int
 		GraphMaxCommitNum     int
 		CodeCommentLines      int
 		ReactionMaxUserNum    int
@@ -264,6 +264,7 @@ var (
 		MembersPagingNum:    20,
 		FeedMaxCommitNum:    5,
 		FeedPagingNum:       20,
+		PackagesPagingNum:   20,
 		GraphMaxCommitNum:   100,
 		CodeCommentLines:    4,
 		ReactionMaxUserNum:  10,
@@ -610,7 +611,7 @@ func loadFromConf(allowEmpty bool, extraConfig string) {
 
 	Cfg.NameMapper = ini.SnackCase
 
-	homeDir, err := com.HomeDir()
+	homeDir, err := util.HomeDir()
 	if err != nil {
 		log.Fatal("Failed to get home directory: %v", err)
 	}
@@ -1015,6 +1016,8 @@ func loadFromConf(allowEmpty bool, extraConfig string) {
 	newRepository()
 
 	newPictureService()
+
+	newPackages()
 
 	if err = Cfg.Section("ui").MapTo(&UI); err != nil {
 		log.Fatal("Failed to map UI settings: %v", err)

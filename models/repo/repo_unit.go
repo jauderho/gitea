@@ -5,6 +5,7 @@
 package repo
 
 import (
+	"context"
 	"fmt"
 
 	"code.gitea.io/gitea/models/db"
@@ -150,24 +151,6 @@ func (cfg *PullRequestsConfig) GetDefaultMergeStyle() MergeStyle {
 	return MergeStyleMerge
 }
 
-// AllowedMergeStyleCount returns the total count of allowed merge styles for the PullRequestsConfig
-func (cfg *PullRequestsConfig) AllowedMergeStyleCount() int {
-	count := 0
-	if cfg.AllowMerge {
-		count++
-	}
-	if cfg.AllowRebase {
-		count++
-	}
-	if cfg.AllowRebaseMerge {
-		count++
-	}
-	if cfg.AllowSquash {
-		count++
-	}
-	return count
-}
-
 // BeforeSet is invoked from XORM before setting the value of a field of this object.
 func (r *RepoUnit) BeforeSet(colName string, val xorm.Cell) {
 	switch colName {
@@ -224,9 +207,9 @@ func (r *RepoUnit) ExternalTrackerConfig() *ExternalTrackerConfig {
 	return r.Config.(*ExternalTrackerConfig)
 }
 
-func getUnitsByRepoID(e db.Engine, repoID int64) (units []*RepoUnit, err error) {
+func getUnitsByRepoID(ctx context.Context, repoID int64) (units []*RepoUnit, err error) {
 	var tmpUnits []*RepoUnit
-	if err := e.Where("repo_id = ?", repoID).Find(&tmpUnits); err != nil {
+	if err := db.GetEngine(ctx).Where("repo_id = ?", repoID).Find(&tmpUnits); err != nil {
 		return nil, err
 	}
 

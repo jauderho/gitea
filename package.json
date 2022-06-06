@@ -45,7 +45,7 @@
   },
   "devDependencies": {
     "@happy-dom/jest-environment": "4.0.1",
-    "eslint": "8.15.0",
+    "eslint": "8.17.0",
     "eslint-plugin-html": "6.2.0",
     "eslint-plugin-import": "2.26.0",
     "eslint-plugin-jquery": "1.5.1",

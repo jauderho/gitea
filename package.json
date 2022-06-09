@@ -54,7 +54,7 @@
     "jest": "28.1.0",
     "jest-extended": "2.0.0",
     "postcss-less": "6.0.0",
-    "stylelint": "14.8.2",
+    "stylelint": "14.9.0",
     "stylelint-config-standard": "25.0.0",
     "svgo": "2.8.0",
     "updates": "13.0.5"

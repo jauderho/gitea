@@ -44,7 +44,7 @@
     "wrap-ansi": "8.0.1"
   },
   "devDependencies": {
-    "@happy-dom/jest-environment": "4.0.1",
+    "@happy-dom/jest-environment": "5.3.4",
     "eslint": "8.15.0",
     "eslint-plugin-html": "6.2.0",
     "eslint-plugin-import": "2.26.0",

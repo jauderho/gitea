@@ -23,9 +23,11 @@ import (
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/timeutil"
 	"code.gitea.io/gitea/modules/util"
+
+	"xorm.io/builder"
 )
 
-// ErrUserDoesNotHaveAccessToRepo represets an error where the user doesn't has access to a given repo.
+// ErrUserDoesNotHaveAccessToRepo represents an error where the user doesn't has access to a given repo.
 type ErrUserDoesNotHaveAccessToRepo struct {
 	UserID   int64
 	RepoName string
@@ -39,6 +41,10 @@ func IsErrUserDoesNotHaveAccessToRepo(err error) bool {
 
 func (err ErrUserDoesNotHaveAccessToRepo) Error() string {
 	return fmt.Sprintf("user doesn't have access to repo [user_id: %d, repo_name: %s]", err.UserID, err.RepoName)
+}
+
+func (err ErrUserDoesNotHaveAccessToRepo) Unwrap() error {
+	return util.ErrPermissionDenied
 }
 
 var (
@@ -280,7 +286,7 @@ func (repo *Repository) CommitLink(commitID string) (result string) {
 	} else {
 		result = repo.HTMLURL() + "/commit/" + url.PathEscape(commitID)
 	}
-	return
+	return result
 }
 
 // APIURL returns the repository API URL
@@ -319,13 +325,7 @@ func (repo *Repository) LoadUnits(ctx context.Context) (err error) {
 
 // UnitEnabled if this repository has the given unit enabled
 func (repo *Repository) UnitEnabled(tp unit.Type) (result bool) {
-	if err := db.WithContext(func(ctx *db.Context) error {
-		result = repo.UnitEnabledCtx(ctx, tp)
-		return nil
-	}); err != nil {
-		log.Error("repo.UnitEnabled: %v", err)
-	}
-	return
+	return repo.UnitEnabledCtx(db.DefaultContext, tp)
 }
 
 // UnitEnabled if this repository has the given unit enabled
@@ -546,7 +546,7 @@ func (repo *Repository) DescriptionHTML(ctx context.Context) template.HTML {
 		log.Error("Failed to render description for %s (ID: %d): %v", repo.Name, repo.ID, err)
 		return template.HTML(markup.Sanitize(repo.Description))
 	}
-	return template.HTML(markup.Sanitize(string(desc)))
+	return template.HTML(markup.Sanitize(desc))
 }
 
 // CloneLink represents different types of clone URLs of repository.
@@ -645,6 +645,11 @@ func IsErrRepoNotExist(err error) bool {
 func (err ErrRepoNotExist) Error() string {
 	return fmt.Sprintf("repository does not exist [id: %d, uid: %d, owner_name: %s, name: %s]",
 		err.ID, err.UID, err.OwnerName, err.Name)
+}
+
+// Unwrap unwraps this error as a ErrNotExist error
+func (err ErrRepoNotExist) Unwrap() error {
+	return util.ErrNotExist
 }
 
 // GetRepositoryByOwnerAndNameCtx returns the repository by given owner name and repo name
@@ -755,38 +760,45 @@ func CountRepositories(ctx context.Context, opts CountRepositoryOptions) (int64,
 
 	count, err := sess.Count(new(Repository))
 	if err != nil {
-		return 0, fmt.Errorf("countRepositories: %v", err)
+		return 0, fmt.Errorf("countRepositories: %w", err)
 	}
 	return count, nil
 }
 
-// StatsCorrectNumClosed update repository's issue related numbers
-func StatsCorrectNumClosed(ctx context.Context, id int64, isPull bool, field string) error {
-	_, err := db.Exec(ctx, "UPDATE `repository` SET "+field+"=(SELECT COUNT(*) FROM `issue` WHERE repo_id=? AND is_closed=? AND is_pull=?) WHERE id=?", id, true, isPull, id)
+// UpdateRepoIssueNumbers updates one of a repositories amount of (open|closed) (issues|PRs) with the current count
+func UpdateRepoIssueNumbers(ctx context.Context, repoID int64, isPull, isClosed bool) error {
+	field := "num_"
+	if isClosed {
+		field += "closed_"
+	}
+	if isPull {
+		field += "pulls"
+	} else {
+		field += "issues"
+	}
+
+	subQuery := builder.Select("count(*)").
+		From("issue").Where(builder.Eq{
+		"repo_id": repoID,
+		"is_pull": isPull,
+	}.And(builder.If(isClosed, builder.Eq{"is_closed": isClosed})))
+
+	// builder.Update(cond) will generate SQL like UPDATE ... SET cond
+	query := builder.Update(builder.Eq{field: subQuery}).
+		From("repository").
+		Where(builder.Eq{"id": repoID})
+	_, err := db.Exec(ctx, query)
 	return err
 }
 
-// UpdateRepoIssueNumbers update repository issue numbers
-func UpdateRepoIssueNumbers(ctx context.Context, repoID int64, isPull, isClosed bool) error {
-	e := db.GetEngine(ctx)
-	if isPull {
-		if _, err := e.ID(repoID).Decr("num_pulls").Update(new(Repository)); err != nil {
-			return err
-		}
-		if isClosed {
-			if _, err := e.ID(repoID).Decr("num_closed_pulls").Update(new(Repository)); err != nil {
-				return err
-			}
-		}
-	} else {
-		if _, err := e.ID(repoID).Decr("num_issues").Update(new(Repository)); err != nil {
-			return err
-		}
-		if isClosed {
-			if _, err := e.ID(repoID).Decr("num_closed_issues").Update(new(Repository)); err != nil {
-				return err
-			}
-		}
-	}
-	return nil
+// CountNullArchivedRepository counts the number of repositories with is_archived is null
+func CountNullArchivedRepository() (int64, error) {
+	return db.GetEngine(db.DefaultContext).Where(builder.IsNull{"is_archived"}).Count(new(Repository))
+}
+
+// FixNullArchivedRepository sets is_archived to false where it is null
+func FixNullArchivedRepository() (int64, error) {
+	return db.GetEngine(db.DefaultContext).Where(builder.IsNull{"is_archived"}).Cols("is_archived").NoAutoTime().Update(&Repository{
+		IsArchived: false,
+	})
 }

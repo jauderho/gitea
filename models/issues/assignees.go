@@ -42,7 +42,7 @@ func (issue *Issue) LoadAssignees(ctx context.Context) (err error) {
 	if len(issue.Assignees) > 0 {
 		issue.Assignee = issue.Assignees[0]
 	}
-	return
+	return err
 }
 
 // GetAssigneeIDsByIssue returns the IDs of users assigned to an issue
@@ -85,12 +85,12 @@ func ToggleIssueAssignee(issue *Issue, doer *user_model.User, assigneeID int64) 
 func toggleIssueAssignee(ctx context.Context, issue *Issue, doer *user_model.User, assigneeID int64, isCreate bool) (removed bool, comment *Comment, err error) {
 	removed, err = toggleUserAssignee(ctx, issue, assigneeID)
 	if err != nil {
-		return false, nil, fmt.Errorf("UpdateIssueUserByAssignee: %v", err)
+		return false, nil, fmt.Errorf("UpdateIssueUserByAssignee: %w", err)
 	}
 
 	// Repo infos
 	if err = issue.LoadRepo(ctx); err != nil {
-		return false, nil, fmt.Errorf("loadRepo: %v", err)
+		return false, nil, fmt.Errorf("loadRepo: %w", err)
 	}
 
 	opts := &CreateCommentOptions{
@@ -104,7 +104,7 @@ func toggleIssueAssignee(ctx context.Context, issue *Issue, doer *user_model.Use
 	// Comment
 	comment, err = CreateCommentCtx(ctx, opts)
 	if err != nil {
-		return false, nil, fmt.Errorf("createComment: %v", err)
+		return false, nil, fmt.Errorf("createComment: %w", err)
 	}
 
 	// if pull request is in the middle of creation - don't call webhook
@@ -167,5 +167,5 @@ func MakeIDsFromAPIAssigneesToAdd(oneAssignee string, multipleAssignees []string
 	// Get the IDs of all assignees
 	assigneeIDs, err = user_model.GetUserIDsByNames(requestAssignees, false)
 
-	return
+	return assigneeIDs, err
 }

@@ -10,7 +10,7 @@
     "@claviska/jquery-minicolors": "2.3.6",
     "@mcaptcha/vanilla-glue": "0.1.0-alpha-3",
     "@primer/octicons": "17.7.0",
-    "@vue/compiler-sfc": "3.2.40",
+    "@vue/compiler-sfc": "3.2.41",
     "add-asset-webpack-plugin": "2.0.1",
     "css-loader": "6.7.1",
     "dropzone": "6.0.0-beta.2",

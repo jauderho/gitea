@@ -19,6 +19,7 @@ import (
 	"code.gitea.io/gitea/models/migrations/v1_17"
 	"code.gitea.io/gitea/models/migrations/v1_18"
 	"code.gitea.io/gitea/models/migrations/v1_19"
+	"code.gitea.io/gitea/models/migrations/v1_20"
 	"code.gitea.io/gitea/models/migrations/v1_6"
 	"code.gitea.io/gitea/models/migrations/v1_7"
 	"code.gitea.io/gitea/models/migrations/v1_8"
@@ -432,6 +433,9 @@ var migrations = []Migration{
 	NewMigration("Update counts of all open milestones", v1_18.UpdateOpenMilestoneCounts),
 	// v230 -> v231
 	NewMigration("Add ConfidentialClient column (default true) to OAuth2Application table", v1_18.AddConfidentialClientColumnToOAuth2ApplicationTable),
+
+	// Gitea 1.18.0 ends at v231
+
 	// v231 -> v232
 	NewMigration("Add index for hook_task", v1_19.AddIndexForHookTask),
 	// v232 -> v233
@@ -442,6 +446,45 @@ var migrations = []Migration{
 	NewMigration("Add package cleanup rule table", v1_19.CreatePackageCleanupRuleTable),
 	// v235 -> v236
 	NewMigration("Add index for access_token", v1_19.AddIndexForAccessToken),
+	// v236 -> v237
+	NewMigration("Create secrets table", v1_19.CreateSecretsTable),
+	// v237 -> v238
+	NewMigration("Drop ForeignReference table", v1_19.DropForeignReferenceTable),
+	// v238 -> v239
+	NewMigration("Add updated unix to LFSMetaObject", v1_19.AddUpdatedUnixToLFSMetaObject),
+	// v239 -> v240
+	NewMigration("Add scope for access_token", v1_19.AddScopeForAccessTokens),
+	// v240 -> v241
+	NewMigration("Add actions tables", v1_19.AddActionsTables),
+	// v241 -> v242
+	NewMigration("Add card_type column to project table", v1_19.AddCardTypeToProjectTable),
+	// v242 -> v243
+	NewMigration("Alter gpg_key_import content TEXT field to MEDIUMTEXT", v1_19.AlterPublicGPGKeyImportContentFieldToMediumText),
+	// v243 -> v244
+	NewMigration("Add exclusive label", v1_19.AddExclusiveLabel),
+
+	// Gitea 1.19.0 ends at v244
+
+	// v244 -> v245
+	NewMigration("Add NeedApproval to actions tables", v1_20.AddNeedApprovalToActionRun),
+	// v245 -> v246
+	NewMigration("Rename Webhook org_id to owner_id", v1_20.RenameWebhookOrgToOwner),
+	// v246 -> v247
+	NewMigration("Add missed column owner_id for project table", v1_20.AddNewColumnForProject),
+	// v247 -> v248
+	NewMigration("Fix incorrect project type", v1_20.FixIncorrectProjectType),
+	// v248 -> v249
+	NewMigration("Add version column to action_runner table", v1_20.AddVersionToActionRunner),
+	// v249 -> v250
+	NewMigration("Improve Action table indices v3", v1_20.ImproveActionTableIndices),
+	// v250 -> v251
+	NewMigration("Change Container Metadata", v1_20.ChangeContainerMetadataMultiArch),
+	// v251 -> v252
+	NewMigration("Fix incorrect owner team unit access mode", v1_20.FixIncorrectOwnerTeamUnitAccessMode),
+	// v252 -> v253
+	NewMigration("Fix incorrect admin team unit access mode", v1_20.FixIncorrectAdminTeamUnitAccessMode),
+	// v253 -> v254
+	NewMigration("Fix ExternalTracker and ExternalWiki accessMode in owner and admin team", v1_20.FixExternalTrackerAndExternalWikiAccessModeInOwnerAndAdminTeam),
 }
 
 // GetCurrentDBVersion returns the current db version

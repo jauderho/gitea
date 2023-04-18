@@ -7,7 +7,6 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"time"
 
 	"code.gitea.io/gitea/models/db"
 	repo_model "code.gitea.io/gitea/models/repo"
@@ -65,7 +64,6 @@ type Milestone struct {
 	DeadlineString string `xorm:"-"`
 
 	TotalTrackedTime int64 `xorm:"-"`
-	TimeSinceUpdate  int64 `xorm:"-"`
 }
 
 func init() {
@@ -84,9 +82,6 @@ func (m *Milestone) BeforeUpdate() {
 // AfterLoad is invoked from XORM after setting the value of a field of
 // this object.
 func (m *Milestone) AfterLoad() {
-	if !m.UpdatedUnix.IsZero() {
-		m.TimeSinceUpdate = time.Now().Unix() - m.UpdatedUnix.AsTime().Unix()
-	}
 	m.NumOpenIssues = m.NumIssues - m.NumClosedIssues
 	if m.DeadlineUnix.Year() == 9999 {
 		return
@@ -284,7 +279,7 @@ func DeleteMilestoneByRepoID(repoID, id int64) error {
 		return err
 	}
 
-	repo, err := repo_model.GetRepositoryByID(m.RepoID)
+	repo, err := repo_model.GetRepositoryByID(db.DefaultContext, m.RepoID)
 	if err != nil {
 		return err
 	}

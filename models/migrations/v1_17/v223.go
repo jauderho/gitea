@@ -1,7 +1,7 @@
 // Copyright 2022 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-package v1_17 // nolint
+package v1_17 //nolint
 
 import (
 	"context"
@@ -65,11 +65,11 @@ func RenameCredentialIDBytes(x *xorm.Engine) error {
 		}
 
 		switch {
-		case setting.Database.UseMySQL:
+		case setting.Database.Type.IsMySQL():
 			if _, err := sess.Exec("ALTER TABLE `webauthn_credential` CHANGE credential_id_bytes credential_id VARBINARY(1024)"); err != nil {
 				return err
 			}
-		case setting.Database.UseMSSQL:
+		case setting.Database.Type.IsMSSQL():
 			if _, err := sess.Exec("sp_rename 'webauthn_credential.credential_id_bytes', 'credential_id', 'COLUMN'"); err != nil {
 				return err
 			}

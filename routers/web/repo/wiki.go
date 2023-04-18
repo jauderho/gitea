@@ -59,7 +59,7 @@ func MustEnableWiki(ctx *context.Context) {
 		return
 	}
 
-	unit, err := ctx.Repo.Repository.GetUnit(unit.TypeExternalWiki)
+	unit, err := ctx.Repo.Repository.GetUnit(ctx, unit.TypeExternalWiki)
 	if err == nil {
 		ctx.Redirect(unit.ExternalWikiConfig().ExternalWikiURL)
 		return
@@ -298,7 +298,15 @@ func renderViewPage(ctx *context.Context) (*git.Repository, *git.TreeEntry) {
 		ctx.Data["footerPresent"] = false
 	}
 
-	ctx.Data["toc"] = rctx.TableOfContents
+	if rctx.SidebarTocNode != nil {
+		sb := &strings.Builder{}
+		err = markdown.SpecializedMarkdown().Renderer().Render(sb, nil, rctx.SidebarTocNode)
+		if err != nil {
+			log.Error("Failed to render wiki sidebar TOC: %v", err)
+		} else {
+			ctx.Data["sidebarTocContent"] = sb.String()
+		}
+	}
 
 	// get commit count - wiki revisions
 	commitsCount, _ := wikiRepo.FileCommitsCount(wiki_service.DefaultBranch, pageFilename)
@@ -368,7 +376,7 @@ func renderRevisionPage(ctx *context.Context) (*git.Repository, *git.TreeEntry) 
 		ctx.ServerError("CommitsByFileAndRange", err)
 		return nil, nil
 	}
-	ctx.Data["Commits"] = git_model.ConvertFromGitCommit(commitsHistory, ctx.Repo.Repository)
+	ctx.Data["Commits"] = git_model.ConvertFromGitCommit(ctx, commitsHistory, ctx.Repo.Repository)
 
 	pager := context.NewPagination(int(commitsCount), setting.Git.CommitsRangeSize, page, 5)
 	pager.SetDefaultParams(ctx)

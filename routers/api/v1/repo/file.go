@@ -179,7 +179,7 @@ func GetRawFileOrLFS(ctx *context.APIContext) {
 	}
 
 	// Now check if there is a meta object for this pointer
-	meta, err := git_model.GetLFSMetaObjectByOid(ctx.Repo.Repository.ID, pointer.Oid)
+	meta, err := git_model.GetLFSMetaObjectByOid(ctx, ctx.Repo.Repository.ID, pointer.Oid)
 
 	// If there isn't one just serve the data directly
 	if err == git_model.ErrLFSObjectNotExist {
@@ -381,7 +381,7 @@ func GetEditorconfig(ctx *context.APIContext) {
 	//   "404":
 	//     "$ref": "#/responses/notFound"
 
-	ec, err := ctx.Repo.GetEditorconfig(ctx.Repo.Commit)
+	ec, _, err := ctx.Repo.GetEditorconfig(ctx.Repo.Commit)
 	if err != nil {
 		if git.IsErrNotExist(err) {
 			ctx.NotFound(err)

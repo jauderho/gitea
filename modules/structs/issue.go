@@ -41,18 +41,19 @@ type RepositoryMeta struct {
 // Issue represents an issue in a repository
 // swagger:model
 type Issue struct {
-	ID               int64      `json:"id"`
-	URL              string     `json:"url"`
-	HTMLURL          string     `json:"html_url"`
-	Index            int64      `json:"number"`
-	Poster           *User      `json:"user"`
-	OriginalAuthor   string     `json:"original_author"`
-	OriginalAuthorID int64      `json:"original_author_id"`
-	Title            string     `json:"title"`
-	Body             string     `json:"body"`
-	Ref              string     `json:"ref"`
-	Labels           []*Label   `json:"labels"`
-	Milestone        *Milestone `json:"milestone"`
+	ID               int64         `json:"id"`
+	URL              string        `json:"url"`
+	HTMLURL          string        `json:"html_url"`
+	Index            int64         `json:"number"`
+	Poster           *User         `json:"user"`
+	OriginalAuthor   string        `json:"original_author"`
+	OriginalAuthorID int64         `json:"original_author_id"`
+	Title            string        `json:"title"`
+	Body             string        `json:"body"`
+	Ref              string        `json:"ref"`
+	Attachments      []*Attachment `json:"assets"`
+	Labels           []*Label      `json:"labels"`
+	Milestone        *Milestone    `json:"milestone"`
 	// deprecated
 	Assignee  *User   `json:"assignee"`
 	Assignees []*User `json:"assignees"`
@@ -189,6 +190,22 @@ func (l *IssueTemplateLabels) UnmarshalYAML(value *yaml.Node) error {
 	return fmt.Errorf("line %d: cannot unmarshal %s into IssueTemplateLabels", value.Line, value.ShortTag())
 }
 
+type IssueConfigContactLink struct {
+	Name  string `json:"name" yaml:"name"`
+	URL   string `json:"url" yaml:"url"`
+	About string `json:"about" yaml:"about"`
+}
+
+type IssueConfig struct {
+	BlankIssuesEnabled bool                     `json:"blank_issues_enabled" yaml:"blank_issues_enabled"`
+	ContactLinks       []IssueConfigContactLink `json:"contact_links" yaml:"contact_links"`
+}
+
+type IssueConfigValidation struct {
+	Valid   bool   `json:"valid"`
+	Message string `json:"message"`
+}
+
 // IssueTemplateType defines issue template type
 type IssueTemplateType string
 
@@ -209,4 +226,12 @@ func (it IssueTemplate) Type() IssueTemplateType {
 		return IssueTemplateTypeYaml
 	}
 	return ""
+}
+
+// IssueMeta basic issue information
+// swagger:model
+type IssueMeta struct {
+	Index int64  `json:"index"`
+	Owner string `json:"owner"`
+	Name  string `json:"repo"`
 }

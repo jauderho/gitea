@@ -13,6 +13,9 @@ import (
 
 	"code.gitea.io/gitea/models/db"
 	packages_model "code.gitea.io/gitea/models/packages"
+	access_model "code.gitea.io/gitea/models/perm/access"
+	repo_model "code.gitea.io/gitea/models/repo"
+	"code.gitea.io/gitea/models/unit"
 	"code.gitea.io/gitea/modules/context"
 	packages_module "code.gitea.io/gitea/modules/packages"
 	npm_module "code.gitea.io/gitea/modules/packages/npm"
@@ -158,8 +161,32 @@ func DownloadPackageFileByName(ctx *context.Context) {
 func UploadPackage(ctx *context.Context) {
 	npmPackage, err := npm_module.ParsePackage(ctx.Req.Body)
 	if err != nil {
-		apiError(ctx, http.StatusBadRequest, err)
+		if errors.Is(err, util.ErrInvalidArgument) {
+			apiError(ctx, http.StatusBadRequest, err)
+		} else {
+			apiError(ctx, http.StatusInternalServerError, err)
+		}
 		return
+	}
+
+	repo, err := repo_model.GetRepositoryByURL(ctx, npmPackage.Metadata.Repository.URL)
+	if err == nil {
+		canWrite := repo.OwnerID == ctx.Doer.ID
+
+		if !canWrite {
+			perms, err := access_model.GetUserRepoPermission(ctx, repo, ctx.Doer)
+			if err != nil {
+				apiError(ctx, http.StatusInternalServerError, err)
+				return
+			}
+
+			canWrite = perms.CanWrite(unit.TypePackages)
+		}
+
+		if !canWrite {
+			apiError(ctx, http.StatusForbidden, "no permission to upload this package")
+			return
+		}
 	}
 
 	buf, err := packages_module.CreateHashedBufferFromReader(bytes.NewReader(npmPackage.Data), 32*1024*1024)
@@ -208,6 +235,13 @@ func UploadPackage(ctx *context.Context) {
 				apiError(ctx, http.StatusBadRequest, err)
 				return
 			}
+			apiError(ctx, http.StatusInternalServerError, err)
+			return
+		}
+	}
+
+	if repo != nil {
+		if err := packages_model.SetRepositoryLink(ctx, pv.PackageID, repo.ID); err != nil {
 			apiError(ctx, http.StatusInternalServerError, err)
 			return
 		}
@@ -405,8 +439,9 @@ func setPackageTag(tag string, pv *packages_model.PackageVersion, deleteOnly boo
 
 func PackageSearch(ctx *context.Context) {
 	pvs, total, err := packages_model.SearchLatestVersions(ctx, &packages_model.PackageSearchOptions{
-		OwnerID: ctx.Package.Owner.ID,
-		Type:    packages_model.TypeNpm,
+		OwnerID:    ctx.Package.Owner.ID,
+		Type:       packages_model.TypeNpm,
+		IsInternal: util.OptionalBoolFalse,
 		Name: packages_model.SearchValue{
 			ExactMatch: false,
 			Value:      ctx.FormTrim("text"),

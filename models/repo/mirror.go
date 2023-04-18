@@ -6,16 +6,16 @@ package repo
 
 import (
 	"context"
-	"errors"
 	"time"
 
 	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/modules/util"
 )
 
 // ErrMirrorNotExist mirror does not exist error
-var ErrMirrorNotExist = errors.New("Mirror does not exist")
+var ErrMirrorNotExist = util.NewNotExistErrorf("Mirror does not exist")
 
 // Mirror represents mirror information of a repository.
 type Mirror struct {
@@ -52,7 +52,7 @@ func (m *Mirror) GetRepository() *Repository {
 		return m.Repo
 	}
 	var err error
-	m.Repo, err = GetRepositoryByIDCtx(db.DefaultContext, m.RepoID)
+	m.Repo, err = GetRepositoryByID(db.DefaultContext, m.RepoID)
 	if err != nil {
 		log.Error("getRepositoryByID[%d]: %v", m.ID, err)
 	}

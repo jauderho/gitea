@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"regexp"
+	"sort"
 	"strings"
 
 	packages_model "code.gitea.io/gitea/models/packages"
@@ -21,8 +22,10 @@ import (
 )
 
 // https://peps.python.org/pep-0426/#name
-var normalizer = strings.NewReplacer(".", "-", "_", "-")
-var nameMatcher = regexp.MustCompile(`\A(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\.\-_]*[a-zA-Z0-9])\z`)
+var (
+	normalizer  = strings.NewReplacer(".", "-", "_", "-")
+	nameMatcher = regexp.MustCompile(`\A(?:[a-zA-Z0-9]|[a-zA-Z0-9][a-zA-Z0-9\.\-_]*[a-zA-Z0-9])\z`)
+)
 
 // https://peps.python.org/pep-0440/#appendix-b-parsing-version-strings-with-regular-expressions
 var versionMatcher = regexp.MustCompile(`\Av?` +
@@ -59,6 +62,11 @@ func PackageMetadata(ctx *context.Context) {
 		apiError(ctx, http.StatusInternalServerError, err)
 		return
 	}
+
+	// sort package descriptors by version to mimic PyPI format
+	sort.Slice(pds, func(i, j int) bool {
+		return strings.Compare(pds[i].Version.Version, pds[j].Version.Version) < 0
+	})
 
 	ctx.Data["RegistryURL"] = setting.AppURL + "api/packages/" + ctx.Package.Owner.Name + "/pypi"
 	ctx.Data["PackageDescriptor"] = pds[0]

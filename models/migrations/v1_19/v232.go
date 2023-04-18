@@ -1,7 +1,7 @@
 // Copyright 2022 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-package v1_19 // nolint
+package v1_19 //nolint
 
 import (
 	"code.gitea.io/gitea/modules/setting"
@@ -16,7 +16,7 @@ func AlterPackageVersionMetadataToLongText(x *xorm.Engine) error {
 		return err
 	}
 
-	if setting.Database.UseMySQL {
+	if setting.Database.Type.IsMySQL() {
 		if _, err := sess.Exec("ALTER TABLE `package_version` MODIFY COLUMN `metadata_json` LONGTEXT"); err != nil {
 			return err
 		}

@@ -30,16 +30,19 @@ import (
 	"code.gitea.io/gitea/modules/translation"
 	"code.gitea.io/gitea/modules/util"
 	"code.gitea.io/gitea/modules/web"
+	actions_router "code.gitea.io/gitea/routers/api/actions"
 	packages_router "code.gitea.io/gitea/routers/api/packages"
 	apiv1 "code.gitea.io/gitea/routers/api/v1"
 	"code.gitea.io/gitea/routers/common"
 	"code.gitea.io/gitea/routers/private"
 	web_routers "code.gitea.io/gitea/routers/web"
+	actions_service "code.gitea.io/gitea/services/actions"
 	"code.gitea.io/gitea/services/auth"
 	"code.gitea.io/gitea/services/auth/source/oauth2"
 	"code.gitea.io/gitea/services/automerge"
 	"code.gitea.io/gitea/services/cron"
 	"code.gitea.io/gitea/services/mailer"
+	mailer_incoming "code.gitea.io/gitea/services/mailer/incoming"
 	markup_service "code.gitea.io/gitea/services/markup"
 	repo_migrations "code.gitea.io/gitea/services/migrations"
 	mirror_service "code.gitea.io/gitea/services/mirror"
@@ -66,13 +69,6 @@ func mustInitCtx(ctx context.Context, fn func(ctx context.Context) error) {
 		fi := runtime.FuncForPC(ptr)
 		log.Fatal("%s(ctx) failed: %v", fi.Name(), err)
 	}
-}
-
-// InitGitServices init new services for git, this is also called in `contrib/pr/checkout.go`
-func InitGitServices() {
-	setting.NewServices()
-	mustInit(storage.Init)
-	mustInit(repo_service.Init)
 }
 
 func syncAppConfForGit(ctx context.Context) error {
@@ -116,14 +112,15 @@ func GlobalInitInstalled(ctx context.Context) {
 	log.Info("AppPath: %s", setting.AppPath)
 	log.Info("AppWorkPath: %s", setting.AppWorkPath)
 	log.Info("Custom path: %s", setting.CustomPath)
-	log.Info("Log path: %s", setting.LogRootPath)
+	log.Info("Log path: %s", setting.Log.RootPath)
 	log.Info("Configuration file: %s", setting.CustomConf)
 	log.Info("Run Mode: %s", util.ToTitleCase(setting.RunMode))
+	log.Info("Gitea v%s%s", setting.AppVer, setting.AppBuiltWith)
 
 	// Setup i18n
 	translation.InitLocales(ctx)
 
-	setting.NewServices()
+	setting.LoadSettings()
 	mustInit(storage.Init)
 
 	mailer.NewContext(ctx)
@@ -137,7 +134,7 @@ func GlobalInitInstalled(ctx context.Context) {
 
 	if setting.EnableSQLite3 {
 		log.Info("SQLite3 support is enabled")
-	} else if setting.Database.UseSQLite3 {
+	} else if setting.Database.Type.IsSQLite3() {
 		log.Fatal("SQLite3 support is disabled, but it is used for database setting. Please get or build a Gitea release with SQLite3 support.")
 	}
 
@@ -146,7 +143,7 @@ func GlobalInitInstalled(ctx context.Context) {
 	mustInit(system.Init)
 	mustInit(oauth2.Init)
 
-	mustInit(models.Init)
+	mustInitCtx(ctx, models.Init)
 	mustInit(repo_service.Init)
 
 	// Booting long running goroutines.
@@ -161,13 +158,16 @@ func GlobalInitInstalled(ctx context.Context) {
 	mustInit(task.Init)
 	mustInit(repo_migrations.Init)
 	eventsource.GetManager().Init()
+	mustInitCtx(ctx, mailer_incoming.Init)
 
 	mustInitCtx(ctx, syncAppConfForGit)
 
 	mustInit(ssh.Init)
 
 	auth.Init()
-	svg.Init()
+	mustInit(svg.Init)
+
+	actions_service.Init()
 
 	// Finally start up the cron
 	cron.NewContext(ctx)
@@ -194,5 +194,11 @@ func NormalRoutes(ctx context.Context) *web.Route {
 		// This implements the OCI API (Note this is not preceded by /api but is instead /v2)
 		r.Mount("/v2", packages_router.ContainerRoutes(ctx))
 	}
+
+	if setting.Actions.Enabled {
+		prefix := "/api/actions"
+		r.Mount(prefix, actions_router.Routes(ctx, prefix))
+	}
+
 	return r
 }

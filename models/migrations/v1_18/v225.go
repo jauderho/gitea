@@ -1,7 +1,7 @@
 // Copyright 2022 The Gitea Authors. All rights reserved.
 // SPDX-License-Identifier: MIT
 
-package v1_18 // nolint
+package v1_18 //nolint
 
 import (
 	"code.gitea.io/gitea/modules/setting"
@@ -16,7 +16,7 @@ func AlterPublicGPGKeyContentFieldsToMediumText(x *xorm.Engine) error {
 		return err
 	}
 
-	if setting.Database.UseMySQL {
+	if setting.Database.Type.IsMySQL() {
 		if _, err := sess.Exec("ALTER TABLE `gpg_key` CHANGE `content` `content` MEDIUMTEXT"); err != nil {
 			return err
 		}

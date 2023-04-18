@@ -19,7 +19,6 @@ import (
 	"code.gitea.io/gitea/models/unit"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/context"
-	"code.gitea.io/gitea/modules/convert"
 	issue_indexer "code.gitea.io/gitea/modules/indexer/issues"
 	"code.gitea.io/gitea/modules/notification"
 	"code.gitea.io/gitea/modules/setting"
@@ -28,6 +27,7 @@ import (
 	"code.gitea.io/gitea/modules/util"
 	"code.gitea.io/gitea/modules/web"
 	"code.gitea.io/gitea/routers/api/v1/utils"
+	"code.gitea.io/gitea/services/convert"
 	issue_service "code.gitea.io/gitea/services/issue"
 )
 
@@ -91,6 +91,10 @@ func SearchIssues(ctx *context.APIContext) {
 	// - name: review_requested
 	//   in: query
 	//   description: filter pulls requesting your review, default is false
+	//   type: boolean
+	// - name: reviewed
+	//   in: query
+	//   description: filter pulls reviewed by you, default is false
 	//   type: boolean
 	// - name: owner
 	//   in: query
@@ -265,6 +269,9 @@ func SearchIssues(ctx *context.APIContext) {
 		}
 		if ctx.FormBool("review_requested") {
 			issuesOpt.ReviewRequestedID = ctxUserID
+		}
+		if ctx.FormBool("reviewed") {
+			issuesOpt.ReviewedID = ctxUserID
 		}
 
 		if issues, err = issues_model.Issues(ctx, issuesOpt); err != nil {
@@ -623,7 +630,7 @@ func CreateIssue(ctx *context.APIContext) {
 
 		// Check if the passed assignees is assignable
 		for _, aID := range assigneeIDs {
-			assignee, err := user_model.GetUserByID(aID)
+			assignee, err := user_model.GetUserByID(ctx, aID)
 			if err != nil {
 				ctx.Error(http.StatusInternalServerError, "GetUserByID", err)
 				return
@@ -644,7 +651,7 @@ func CreateIssue(ctx *context.APIContext) {
 		form.Labels = make([]int64, 0)
 	}
 
-	if err := issue_service.NewIssue(ctx.Repo.Repository, issue, form.Labels, nil, assigneeIDs); err != nil {
+	if err := issue_service.NewIssue(ctx, ctx.Repo.Repository, issue, form.Labels, nil, assigneeIDs); err != nil {
 		if repo_model.IsErrUserDoesNotHaveAccessToRepo(err) {
 			ctx.Error(http.StatusBadRequest, "UserDoesNotHaveAccessToRepo", err)
 			return
@@ -654,7 +661,7 @@ func CreateIssue(ctx *context.APIContext) {
 	}
 
 	if form.Closed {
-		if err := issue_service.ChangeStatus(issue, ctx.Doer, true); err != nil {
+		if err := issue_service.ChangeStatus(issue, ctx.Doer, "", true); err != nil {
 			if issues_model.IsErrDependenciesLeft(err) {
 				ctx.Error(http.StatusPreconditionFailed, "DependenciesLeft", "cannot close this issue because it still has open dependencies")
 				return
@@ -745,7 +752,7 @@ func EditIssue(ctx *context.APIContext) {
 		issue.Content = *form.Body
 	}
 	if form.Ref != nil {
-		err = issue_service.ChangeIssueRef(issue, ctx.Doer, *form.Ref)
+		err = issue_service.ChangeIssueRef(ctx, issue, ctx.Doer, *form.Ref)
 		if err != nil {
 			ctx.Error(http.StatusInternalServerError, "UpdateRef", err)
 			return
@@ -783,7 +790,7 @@ func EditIssue(ctx *context.APIContext) {
 			oneAssignee = *form.Assignee
 		}
 
-		err = issue_service.UpdateAssignees(issue, oneAssignee, form.Assignees, ctx.Doer)
+		err = issue_service.UpdateAssignees(ctx, issue, oneAssignee, form.Assignees, ctx.Doer)
 		if err != nil {
 			ctx.Error(http.StatusInternalServerError, "UpdateAssignees", err)
 			return
@@ -826,7 +833,7 @@ func EditIssue(ctx *context.APIContext) {
 	}
 
 	if statusChangeComment != nil {
-		notification.NotifyIssueChangeStatus(ctx, ctx.Doer, issue, statusChangeComment, issue.IsClosed)
+		notification.NotifyIssueChangeStatus(ctx, ctx.Doer, "", issue, statusChangeComment, issue.IsClosed)
 	}
 
 	// Refetch from database to assign some automatic values
@@ -880,7 +887,7 @@ func DeleteIssue(ctx *context.APIContext) {
 		return
 	}
 
-	if err = issue_service.DeleteIssue(ctx.Doer, ctx.Repo.GitRepo, issue); err != nil {
+	if err = issue_service.DeleteIssue(ctx, ctx.Doer, ctx.Repo.GitRepo, issue); err != nil {
 		ctx.Error(http.StatusInternalServerError, "DeleteIssueByID", err)
 		return
 	}

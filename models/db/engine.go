@@ -38,6 +38,7 @@ type Engine interface {
 	Count(...interface{}) (int64, error)
 	Decr(column string, arg ...interface{}) *xorm.Session
 	Delete(...interface{}) (int64, error)
+	Truncate(...interface{}) (int64, error)
 	Exec(...interface{}) (sql.Result, error)
 	Find(interface{}, ...interface{}) error
 	Get(beans ...interface{}) (bool, error)
@@ -46,7 +47,7 @@ type Engine interface {
 	Incr(column string, arg ...interface{}) *xorm.Session
 	Insert(...interface{}) (int64, error)
 	Iterate(interface{}, xorm.IterFunc) error
-	Join(joinOperator string, tablename interface{}, condition string, args ...interface{}) *xorm.Session
+	Join(joinOperator string, tablename, condition interface{}, args ...interface{}) *xorm.Session
 	SQL(interface{}, ...interface{}) *xorm.Session
 	Where(interface{}, ...interface{}) *xorm.Session
 	Asc(colNames ...string) *xorm.Session
@@ -100,12 +101,12 @@ func newXORMEngine() (*xorm.Engine, error) {
 
 	var engine *xorm.Engine
 
-	if setting.Database.UsePostgreSQL && len(setting.Database.Schema) > 0 {
+	if setting.Database.Type.IsPostgreSQL() && len(setting.Database.Schema) > 0 {
 		// OK whilst we sort out our schema issues - create a schema aware postgres
 		registerPostgresSchemaDriver()
 		engine, err = xorm.NewEngine("postgresschema", connStr)
 	} else {
-		engine, err = xorm.NewEngine(setting.Database.Type, connStr)
+		engine, err = xorm.NewEngine(setting.Database.Type.String(), connStr)
 	}
 
 	if err != nil {

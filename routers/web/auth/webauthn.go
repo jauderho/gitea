@@ -16,8 +16,8 @@ import (
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/services/externalaccount"
 
-	"github.com/duo-labs/webauthn/protocol"
-	"github.com/duo-labs/webauthn/webauthn"
+	"github.com/go-webauthn/webauthn/protocol"
+	"github.com/go-webauthn/webauthn/webauthn"
 )
 
 var tplWebAuthn base.TplName = "user/auth/webauthn"
@@ -49,7 +49,7 @@ func WebAuthnLoginAssertion(ctx *context.Context) {
 		return
 	}
 
-	user, err := user_model.GetUserByID(idSess)
+	user, err := user_model.GetUserByID(ctx, idSess)
 	if err != nil {
 		ctx.ServerError("UserSignIn", err)
 		return
@@ -91,7 +91,7 @@ func WebAuthnLoginAssertionPost(ctx *context.Context) {
 	}()
 
 	// Load the user from the db
-	user, err := user_model.GetUserByID(idSess)
+	user, err := user_model.GetUserByID(ctx, idSess)
 	if err != nil {
 		ctx.ServerError("UserSignIn", err)
 		return

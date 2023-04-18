@@ -12,6 +12,7 @@ import (
 	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/models/perm"
 	repo_model "code.gitea.io/gitea/models/repo"
+	secret_model "code.gitea.io/gitea/models/secret"
 	"code.gitea.io/gitea/models/unit"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/log"
@@ -99,6 +100,11 @@ func (org *Organization) IsOwnedBy(uid int64) (bool, error) {
 	return IsOrganizationOwner(db.DefaultContext, org.ID, uid)
 }
 
+// IsOrgAdmin returns true if given user is in the owner team or an admin team.
+func (org *Organization) IsOrgAdmin(uid int64) (bool, error) {
+	return IsOrganizationAdmin(db.DefaultContext, org.ID, uid)
+}
+
 // IsOrgMember returns true if given user is member of organization.
 func (org *Organization) IsOrgMember(uid int64) (bool, error) {
 	return IsOrganizationMember(db.DefaultContext, org.ID, uid)
@@ -106,25 +112,17 @@ func (org *Organization) IsOrgMember(uid int64) (bool, error) {
 
 // CanCreateOrgRepo returns true if given user can create repo in organization
 func (org *Organization) CanCreateOrgRepo(uid int64) (bool, error) {
-	return CanCreateOrgRepo(org.ID, uid)
-}
-
-func (org *Organization) getTeam(ctx context.Context, name string) (*Team, error) {
-	return GetTeam(ctx, org.ID, name)
+	return CanCreateOrgRepo(db.DefaultContext, org.ID, uid)
 }
 
 // GetTeam returns named team of organization.
-func (org *Organization) GetTeam(name string) (*Team, error) {
-	return org.getTeam(db.DefaultContext, name)
-}
-
-func (org *Organization) getOwnerTeam(ctx context.Context) (*Team, error) {
-	return org.getTeam(ctx, OwnerTeamName)
+func (org *Organization) GetTeam(ctx context.Context, name string) (*Team, error) {
+	return GetTeam(ctx, org.ID, name)
 }
 
 // GetOwnerTeam returns owner team of organization.
-func (org *Organization) GetOwnerTeam() (*Team, error) {
-	return org.getOwnerTeam(db.DefaultContext)
+func (org *Organization) GetOwnerTeam(ctx context.Context) (*Team, error) {
+	return org.GetTeam(ctx, OwnerTeamName)
 }
 
 // FindOrgTeams returns all teams of a given organization
@@ -163,8 +161,8 @@ func (org *Organization) hasMemberWithUserID(ctx context.Context, userID int64) 
 }
 
 // AvatarLink returns the full avatar link with http host
-func (org *Organization) AvatarLink() string {
-	return org.AsUser().AvatarLink()
+func (org *Organization) AvatarLink(ctx context.Context) string {
+	return org.AsUser().AvatarLink(ctx)
 }
 
 // HTMLURL returns the organization's full link.
@@ -246,6 +244,32 @@ func (org *Organization) CustomAvatarRelativePath() string {
 	return org.Avatar
 }
 
+// UnitPermission returns unit permission
+func (org *Organization) UnitPermission(ctx context.Context, doer *user_model.User, unitType unit.Type) perm.AccessMode {
+	if doer != nil {
+		teams, err := GetUserOrgTeams(ctx, org.ID, doer.ID)
+		if err != nil {
+			log.Error("GetUserOrgTeams: %v", err)
+			return perm.AccessModeNone
+		}
+
+		if err := teams.LoadUnits(ctx); err != nil {
+			log.Error("LoadUnits: %v", err)
+			return perm.AccessModeNone
+		}
+
+		if len(teams) > 0 {
+			return teams.UnitMaxAccess(unitType)
+		}
+	}
+
+	if org.Visibility.IsPublic() {
+		return perm.AccessModeRead
+	}
+
+	return perm.AccessModeNone
+}
+
 // CreateOrganization creates record of a new organization.
 func CreateOrganization(org *Organization, owner *user_model.User) (err error) {
 	if !owner.CanCreateOrganization() {
@@ -319,9 +343,10 @@ func CreateOrganization(org *Organization, owner *user_model.User) (err error) {
 	units := make([]TeamUnit, 0, len(unit.AllRepoUnitTypes))
 	for _, tp := range unit.AllRepoUnitTypes {
 		units = append(units, TeamUnit{
-			OrgID:  org.ID,
-			TeamID: t.ID,
-			Type:   tp,
+			OrgID:      org.ID,
+			TeamID:     t.ID,
+			Type:       tp,
+			AccessMode: perm.AccessModeOwner,
 		})
 	}
 
@@ -341,7 +366,7 @@ func CreateOrganization(org *Organization, owner *user_model.User) (err error) {
 }
 
 // GetOrgByName returns organization by given name.
-func GetOrgByName(name string) (*Organization, error) {
+func GetOrgByName(ctx context.Context, name string) (*Organization, error) {
 	if len(name) == 0 {
 		return nil, ErrOrgNotExist{0, name}
 	}
@@ -349,7 +374,7 @@ func GetOrgByName(name string) (*Organization, error) {
 		LowerName: strings.ToLower(name),
 		Type:      user_model.UserTypeOrganization,
 	}
-	has, err := db.GetEngine(db.DefaultContext).Get(u)
+	has, err := db.GetEngine(ctx).Get(u)
 	if err != nil {
 		return nil, err
 	} else if !has {
@@ -370,6 +395,7 @@ func DeleteOrganization(ctx context.Context, org *Organization) error {
 		&TeamUser{OrgID: org.ID},
 		&TeamUnit{OrgID: org.ID},
 		&TeamInvite{OrgID: org.ID},
+		&secret_model.Secret{OwnerID: org.ID},
 	); err != nil {
 		return fmt.Errorf("DeleteBeans: %w", err)
 	}
@@ -395,13 +421,14 @@ func (org *Organization) GetOrgUserMaxAuthorizeLevel(uid int64) (perm.AccessMode
 }
 
 // GetUsersWhoCanCreateOrgRepo returns users which are able to create repo in organization
-func GetUsersWhoCanCreateOrgRepo(ctx context.Context, orgID int64) ([]*user_model.User, error) {
-	users := make([]*user_model.User, 0, 10)
+func GetUsersWhoCanCreateOrgRepo(ctx context.Context, orgID int64) (map[int64]*user_model.User, error) {
+	// Use a map, in order to de-duplicate users.
+	users := make(map[int64]*user_model.User)
 	return users, db.GetEngine(ctx).
 		Join("INNER", "`team_user`", "`team_user`.uid=`user`.id").
 		Join("INNER", "`team`", "`team`.id=`team_user`.team_id").
 		Where(builder.Eq{"team.can_create_org_repo": true}.Or(builder.Eq{"team.authorize": perm.AccessModeOwner})).
-		And("team_user.org_id = ?", orgID).Asc("`user`.name").Find(&users)
+		And("team_user.org_id = ?", orgID).Find(&users)
 }
 
 // SearchOrganizationsOptions options to filter organizations
@@ -701,7 +728,7 @@ func AccessibleReposEnv(ctx context.Context, org *Organization, userID int64) (A
 	var user *user_model.User
 
 	if userID > 0 {
-		u, err := user_model.GetUserByIDCtx(ctx, userID)
+		u, err := user_model.GetUserByID(ctx, userID)
 		if err != nil {
 			return nil, err
 		}

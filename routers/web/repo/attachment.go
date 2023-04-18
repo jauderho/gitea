@@ -44,7 +44,11 @@ func uploadAttachment(ctx *context.Context, repoID int64, allowedTypes string) {
 	}
 	defer file.Close()
 
-	attach, err := attachment.UploadAttachment(file, ctx.Doer.ID, repoID, 0, header.Filename, allowedTypes)
+	attach, err := attachment.UploadAttachment(file, allowedTypes, header.Size, &repo_model.Attachment{
+		Name:       header.Filename,
+		UploaderID: ctx.Doer.ID,
+		RepoID:     repoID,
+	})
 	if err != nil {
 		if upload.IsErrFileTypeForbidden(err) {
 			ctx.Error(http.StatusBadRequest, err.Error())
@@ -82,9 +86,9 @@ func DeleteAttachment(ctx *context.Context) {
 	})
 }
 
-// GetAttachment serve attachements
-func GetAttachment(ctx *context.Context) {
-	attach, err := repo_model.GetAttachmentByUUID(ctx, ctx.Params(":uuid"))
+// GetAttachment serve attachments with the given UUID
+func ServeAttachment(ctx *context.Context, uuid string) {
+	attach, err := repo_model.GetAttachmentByUUID(ctx, uuid)
 	if err != nil {
 		if repo_model.IsErrAttachmentNotExist(err) {
 			ctx.Error(http.StatusNotFound)
@@ -94,7 +98,7 @@ func GetAttachment(ctx *context.Context) {
 		return
 	}
 
-	repository, unitType, err := repo_service.LinkedRepository(attach)
+	repository, unitType, err := repo_service.LinkedRepository(ctx, attach)
 	if err != nil {
 		ctx.ServerError("LinkedRepository", err)
 		return
@@ -148,4 +152,9 @@ func GetAttachment(ctx *context.Context) {
 		ctx.ServerError("ServeData", err)
 		return
 	}
+}
+
+// GetAttachment serve attachments
+func GetAttachment(ctx *context.Context) {
+	ServeAttachment(ctx, ctx.Params(":uuid"))
 }

@@ -66,7 +66,7 @@ require (
 	github.com/json-iterator/go v1.1.12
 	github.com/kballard/go-shellquote v0.0.0-20180428030007-95032a82bc51
 	github.com/keybase/go-crypto v0.0.0-20200123153347-de78d2cb44f4
-	github.com/klauspost/compress v1.15.15
+	github.com/klauspost/compress v1.16.0
 	github.com/klauspost/cpuid/v2 v2.2.4
 	github.com/lib/pq v1.10.7
 	github.com/markbates/goth v1.76.0
@@ -75,7 +75,7 @@ require (
 	github.com/meilisearch/meilisearch-go v0.23.0
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/microcosm-cc/bluemonday v1.0.22
-	github.com/minio/minio-go/v7 v7.0.49
+	github.com/minio/minio-go/v7 v7.0.52
 	github.com/minio/sha256-simd v1.0.0
 	github.com/msteinert/pam v1.1.0
 	github.com/nektos/act v0.2.43

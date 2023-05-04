@@ -49,7 +49,7 @@
     "vue-bar-graph": "2.0.0",
     "vue-loader": "17.0.1",
     "vue3-calendar-heatmap": "2.0.5",
-    "webpack": "5.77.0",
+    "webpack": "5.82.0",
     "webpack-cli": "5.0.1",
     "workbox-routing": "6.5.4",
     "workbox-strategies": "6.5.4",

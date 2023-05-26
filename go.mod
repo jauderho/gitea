@@ -77,8 +77,8 @@ require (
 	github.com/meilisearch/meilisearch-go v0.24.0
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/microcosm-cc/bluemonday v1.0.24
-	github.com/minio/minio-go/v7 v7.0.52
-	github.com/minio/sha256-simd v1.0.0
+	github.com/minio/minio-go/v7 v7.0.55
+	github.com/minio/sha256-simd v1.0.1
 	github.com/msteinert/pam v1.1.0
 	github.com/nektos/act v0.2.45
 	github.com/nfnt/resize v0.0.0-20180221191011-83c6a9932646
@@ -107,7 +107,7 @@ require (
 	github.com/yuin/goldmark v1.5.4
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20220924101305-151362477c87
 	github.com/yuin/goldmark-meta v1.1.0
-	golang.org/x/crypto v0.8.0
+	golang.org/x/crypto v0.9.0
 	golang.org/x/image v0.7.0
 	golang.org/x/net v0.10.0
 	golang.org/x/oauth2 v0.7.0
@@ -260,7 +260,7 @@ require (
 	github.com/segmentio/asm v1.2.0 // indirect
 	github.com/shopspring/decimal v1.3.1 // indirect
 	github.com/shurcooL/httpfs v0.0.0-20190707220628-8d4bc4ba7749 // indirect
-	github.com/sirupsen/logrus v1.9.0 // indirect
+	github.com/sirupsen/logrus v1.9.2 // indirect
 	github.com/skeema/knownhosts v1.1.0 // indirect
 	github.com/spf13/afero v1.9.2 // indirect
 	github.com/spf13/cast v1.5.0 // indirect

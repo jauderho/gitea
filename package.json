@@ -80,7 +80,7 @@
     "svgo": "3.0.2",
     "updates": "14.3.4",
     "vite-string-plugin": "1.1.1",
-    "vitest": "0.33.0"
+    "vitest": "0.34.6"
   },
   "browserslist": [
     "defaults",

@@ -57,7 +57,7 @@ require (
 	github.com/golang-jwt/jwt/v5 v5.0.0
 	github.com/google/go-github/v53 v53.2.0
 	github.com/google/pprof v0.0.0-20230705174524-200ffdc848b8
-	github.com/google/uuid v1.3.0
+	github.com/google/uuid v1.3.1
 	github.com/gorilla/feeds v1.1.1
 	github.com/gorilla/sessions v1.2.1
 	github.com/hashicorp/go-version v1.6.0
@@ -105,14 +105,14 @@ require (
 	github.com/yuin/goldmark v1.5.4
 	github.com/yuin/goldmark-highlighting/v2 v2.0.0-20220924101305-151362477c87
 	github.com/yuin/goldmark-meta v1.1.0
-	golang.org/x/crypto v0.11.0
+	golang.org/x/crypto v0.12.0
 	golang.org/x/image v0.9.0
-	golang.org/x/net v0.12.0
-	golang.org/x/oauth2 v0.10.0
-	golang.org/x/sys v0.10.0
-	golang.org/x/text v0.11.0
+	golang.org/x/net v0.14.0
+	golang.org/x/oauth2 v0.11.0
+	golang.org/x/sys v0.11.0
+	golang.org/x/text v0.12.0
 	golang.org/x/tools v0.11.0
-	google.golang.org/grpc v1.56.2
+	google.golang.org/grpc v1.59.0
 	google.golang.org/protobuf v1.31.0
 	gopkg.in/gomail.v2 v2.0.0-20160411212932-81ebce5c23df
 	gopkg.in/ini.v1 v1.67.0
@@ -124,7 +124,7 @@ require (
 )
 
 require (
-	cloud.google.com/go/compute v1.21.0 // indirect
+	cloud.google.com/go/compute v1.23.0 // indirect
 	cloud.google.com/go/compute/metadata v0.2.3 // indirect
 	git.sr.ht/~mariusor/go-xsd-duration v0.0.0-20220703122237-02e73435a078 // indirect
 	github.com/ClickHouse/ch-go v0.57.0 // indirect
@@ -292,7 +292,7 @@ require (
 	golang.org/x/sync v0.3.0 // indirect
 	golang.org/x/time v0.3.0 // indirect
 	google.golang.org/appengine v1.6.7 // indirect
-	google.golang.org/genproto/googleapis/rpc v0.0.0-20230711160842-782d3b101e98 // indirect
+	google.golang.org/genproto/googleapis/rpc v0.0.0-20230822172742-b8732ec3820d // indirect
 	gopkg.in/alexcesaro/quotedprintable.v3 v3.0.0-20150716171945-2caba252f4dc // indirect
 	gopkg.in/warnings.v0 v0.1.2 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect

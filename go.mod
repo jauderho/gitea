@@ -77,7 +77,7 @@ require (
 	github.com/meilisearch/meilisearch-go v0.25.1
 	github.com/mholt/archiver/v3 v3.5.1
 	github.com/microcosm-cc/bluemonday v1.0.26
-	github.com/minio/minio-go/v7 v7.0.63
+	github.com/minio/minio-go/v7 v7.0.64
 	github.com/minio/sha256-simd v1.0.1
 	github.com/msteinert/pam v1.2.0
 	github.com/nektos/act v0.2.52

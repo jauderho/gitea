@@ -8,10 +8,11 @@ import (
 	"net/http"
 
 	"code.gitea.io/gitea/models/auth"
+	"code.gitea.io/gitea/models/db"
 	"code.gitea.io/gitea/modules/base"
-	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/setting"
 	user_setting "code.gitea.io/gitea/routers/web/user/setting"
+	"code.gitea.io/gitea/services/context"
 )
 
 var (
@@ -22,8 +23,8 @@ var (
 func newOAuth2CommonHandlers() *user_setting.OAuth2CommonHandlers {
 	return &user_setting.OAuth2CommonHandlers{
 		OwnerID:            0,
-		BasePathList:       fmt.Sprintf("%s/admin/applications", setting.AppSubURL),
-		BasePathEditPrefix: fmt.Sprintf("%s/admin/applications/oauth2", setting.AppSubURL),
+		BasePathList:       fmt.Sprintf("%s/-/admin/applications", setting.AppSubURL),
+		BasePathEditPrefix: fmt.Sprintf("%s/-/admin/applications/oauth2", setting.AppSubURL),
 		TplAppEdit:         tplSettingsOauth2ApplicationEdit,
 	}
 }
@@ -33,7 +34,9 @@ func Applications(ctx *context.Context) {
 	ctx.Data["Title"] = ctx.Tr("settings.applications")
 	ctx.Data["PageIsAdminApplications"] = true
 
-	apps, err := auth.GetOAuth2ApplicationsByUserID(ctx, 0)
+	apps, err := db.Find[auth.OAuth2Application](ctx, auth.FindOAuth2ApplicationsOptions{
+		IsGlobal: true,
+	})
 	if err != nil {
 		ctx.ServerError("GetOAuth2ApplicationsByUserID", err)
 		return

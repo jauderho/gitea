@@ -11,25 +11,25 @@ import (
 	"io"
 	"reflect"
 	"strings"
+	"time"
 
+	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/setting"
 
 	"xorm.io/xorm"
+	"xorm.io/xorm/contexts"
 	"xorm.io/xorm/names"
 	"xorm.io/xorm/schemas"
 
-	_ "github.com/denisenkom/go-mssqldb" // Needed for the MSSQL driver
-	_ "github.com/go-sql-driver/mysql"   // Needed for the MySQL driver
-	_ "github.com/lib/pq"                // Needed for the Postgresql driver
+	_ "github.com/go-sql-driver/mysql"  // Needed for the MySQL driver
+	_ "github.com/lib/pq"               // Needed for the Postgresql driver
+	_ "github.com/microsoft/go-mssqldb" // Needed for the MSSQL driver
 )
 
 var (
 	x         *xorm.Engine
 	tables    []any
 	initFuncs []func() error
-
-	// HasEngine specifies if we have a xorm.Engine
-	HasEngine bool
 )
 
 // Engine represents a xorm engine or session.
@@ -57,6 +57,7 @@ type Engine interface {
 	SumInt(bean any, columnName string) (res int64, err error)
 	Sync(...any) error
 	Select(string) *xorm.Session
+	SetExpr(string, any) *xorm.Session
 	NotIn(string, ...any) *xorm.Session
 	OrderBy(any, ...any) *xorm.Session
 	Exist(...any) (bool, error)
@@ -133,6 +134,9 @@ func SyncAllTables() error {
 func InitEngine(ctx context.Context) error {
 	xormEngine, err := newXORMEngine()
 	if err != nil {
+		if strings.Contains(err.Error(), "SQLite3 support") {
+			return fmt.Errorf(`sqlite3 requires: -tags sqlite,sqlite_unlock_notify%s%w`, "\n", err)
+		}
 		return fmt.Errorf("failed to connect to database: %w", err)
 	}
 
@@ -146,6 +150,13 @@ func InitEngine(ctx context.Context) error {
 	xormEngine.SetConnMaxLifetime(setting.Database.ConnMaxLifetime)
 	xormEngine.SetDefaultContext(ctx)
 
+	if setting.Database.SlowQueryThreshold > 0 {
+		xormEngine.AddHook(&SlowQueryHook{
+			Threshold: setting.Database.SlowQueryThreshold,
+			Logger:    log.GetLogger("xorm"),
+		})
+	}
+
 	SetDefaultEngine(ctx, xormEngine)
 	return nil
 }
@@ -153,10 +164,7 @@ func InitEngine(ctx context.Context) error {
 // SetDefaultEngine sets the default engine for db
 func SetDefaultEngine(ctx context.Context, eng *xorm.Engine) {
 	x = eng
-	DefaultContext = &Context{
-		Context: ctx,
-		e:       x,
-	}
+	DefaultContext = &Context{Context: ctx, engine: x}
 }
 
 // UnsetDefaultEngine closes and unsets the default engine
@@ -184,6 +192,8 @@ func InitEngineWithMigration(ctx context.Context, migrateFunc func(*xorm.Engine)
 	if err = x.Ping(); err != nil {
 		return err
 	}
+
+	preprocessDatabaseCollation(x)
 
 	// We have to run migrateFunc here in case the user is re-running installation on a previously created DB.
 	// If we do not then table schemas will be changed and there will be conflicts when the migrations run properly.
@@ -218,7 +228,6 @@ func NamesToBean(names ...string) ([]any, error) {
 	// Need to map provided names to beans...
 	beanMap := make(map[string]any)
 	for _, bean := range tables {
-
 		beanMap[strings.ToLower(reflect.Indirect(reflect.ValueOf(bean)).Type().Name())] = bean
 		beanMap[strings.ToLower(x.TableName(bean))] = bean
 		beanMap[strings.ToLower(x.TableName(bean, true))] = bean
@@ -275,8 +284,8 @@ func MaxBatchInsertSize(bean any) int {
 }
 
 // IsTableNotEmpty returns true if table has at least one record
-func IsTableNotEmpty(tableName string) (bool, error) {
-	return x.Table(tableName).Exist()
+func IsTableNotEmpty(beanOrTableName any) (bool, error) {
+	return x.Table(beanOrTableName).Exist()
 }
 
 // DeleteAllRecords will delete all the records of this table
@@ -298,4 +307,25 @@ func SetLogSQL(ctx context.Context, on bool) {
 	} else if sess, ok := e.(*xorm.Session); ok {
 		sess.Engine().ShowSQL(on)
 	}
+}
+
+type SlowQueryHook struct {
+	Threshold time.Duration
+	Logger    log.Logger
+}
+
+var _ contexts.Hook = &SlowQueryHook{}
+
+func (SlowQueryHook) BeforeProcess(c *contexts.ContextHook) (context.Context, error) {
+	return c.Ctx, nil
+}
+
+func (h *SlowQueryHook) AfterProcess(c *contexts.ContextHook) error {
+	if c.ExecuteTime >= h.Threshold {
+		// 8 is the amount of skips passed to runtime.Caller, so that in the log the correct function
+		// is being displayed (the function that ultimately wants to execute the query in the code)
+		// instead of the function of the slow query hook being called.
+		h.Logger.Log(8, log.WARN, "[Slow SQL Query] %s %v - %v", c.SQL, c.Args, c.ExecuteTime)
+	}
+	return nil
 }

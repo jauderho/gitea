@@ -16,6 +16,8 @@ import (
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/container"
 	"code.gitea.io/gitea/modules/git"
+	"code.gitea.io/gitea/modules/gitrepo"
+	"code.gitea.io/gitea/modules/graceful"
 	"code.gitea.io/gitea/modules/log"
 	"code.gitea.io/gitea/modules/repository"
 	"code.gitea.io/gitea/modules/storage"
@@ -63,7 +65,7 @@ func createTag(ctx context.Context, gitRepo *git.Repository, rel *repo_model.Rel
 
 			commit, err := gitRepo.GetCommit(rel.Target)
 			if err != nil {
-				return false, fmt.Errorf("createTag::GetCommit[%v]: %w", rel.Target, err)
+				return false, err
 			}
 
 			if len(msg) > 0 {
@@ -86,16 +88,17 @@ func createTag(ctx context.Context, gitRepo *git.Repository, rel *repo_model.Rel
 			created = true
 			rel.LowerTagName = strings.ToLower(rel.TagName)
 
+			objectFormat := git.ObjectFormatFromName(rel.Repo.ObjectFormatName)
 			commits := repository.NewPushCommits()
 			commits.HeadCommit = repository.CommitToPushCommit(commit)
-			commits.CompareURL = rel.Repo.ComposeCompareURL(git.EmptySHA, commit.ID.String())
+			commits.CompareURL = rel.Repo.ComposeCompareURL(objectFormat.EmptyObjectID().String(), commit.ID.String())
 
 			refFullName := git.RefNameFromTag(rel.TagName)
 			notify_service.PushCommits(
 				ctx, rel.Publisher, rel.Repo,
 				&repository.PushUpdateOptions{
 					RefFullName: refFullName,
-					OldCommitID: git.EmptySHA,
+					OldCommitID: objectFormat.EmptyObjectID().String(),
 					NewCommitID: commit.ID.String(),
 				}, commits)
 			notify_service.CreateRef(ctx, rel.Publisher, rel.Repo, refFullName, commit.ID.String())
@@ -139,6 +142,7 @@ func CreateRelease(gitRepo *git.Repository, rel *repo_model.Release, attachmentU
 		return err
 	}
 
+	rel.Title, _ = util.SplitStringAtByteN(rel.Title, 255)
 	rel.LowerTagName = strings.ToLower(rel.TagName)
 	if err = db.Insert(gitRepo.Ctx, rel); err != nil {
 		return err
@@ -166,7 +170,7 @@ func CreateNewTag(ctx context.Context, doer *user_model.User, repo *repo_model.R
 		}
 	}
 
-	gitRepo, closer, err := git.RepositoryFromContextOrOpen(ctx, repo.RepoPath())
+	gitRepo, closer, err := gitrepo.RepositoryFromContextOrOpen(ctx, repo)
 	if err != nil {
 		return err
 	}
@@ -201,7 +205,7 @@ func UpdateRelease(ctx context.Context, doer *user_model.User, gitRepo *git.Repo
 	if rel.ID == 0 {
 		return errors.New("UpdateRelease only accepts an exist release")
 	}
-	isCreated, err := createTag(gitRepo.Ctx, gitRepo, rel, "")
+	isTagCreated, err := createTag(gitRepo.Ctx, gitRepo, rel, "")
 	if err != nil {
 		return err
 	}
@@ -212,6 +216,12 @@ func UpdateRelease(ctx context.Context, doer *user_model.User, gitRepo *git.Repo
 		return err
 	}
 	defer committer.Close()
+
+	oldRelease, err := repo_model.GetReleaseByID(ctx, rel.ID)
+	if err != nil {
+		return err
+	}
+	isConvertedFromTag := oldRelease.IsTag && !rel.IsTag
 
 	if err = repo_model.UpdateRelease(ctx, rel); err != nil {
 		return err
@@ -288,30 +298,18 @@ func UpdateRelease(ctx context.Context, doer *user_model.User, gitRepo *git.Repo
 		}
 	}
 
-	if !isCreated {
-		notify_service.UpdateRelease(gitRepo.Ctx, doer, rel)
-		return nil
-	}
-
 	if !rel.IsDraft {
+		if !isTagCreated && !isConvertedFromTag {
+			notify_service.UpdateRelease(gitRepo.Ctx, doer, rel)
+			return nil
+		}
 		notify_service.NewRelease(gitRepo.Ctx, rel)
 	}
-
 	return nil
 }
 
 // DeleteReleaseByID deletes a release and corresponding Git tag by given ID.
-func DeleteReleaseByID(ctx context.Context, id int64, doer *user_model.User, delTag bool) error {
-	rel, err := repo_model.GetReleaseByID(ctx, id)
-	if err != nil {
-		return fmt.Errorf("GetReleaseByID: %w", err)
-	}
-
-	repo, err := repo_model.GetRepositoryByID(ctx, rel.RepoID)
-	if err != nil {
-		return fmt.Errorf("GetRepositoryByID: %w", err)
-	}
-
+func DeleteReleaseByID(ctx context.Context, repo *repo_model.Repository, rel *repo_model.Release, doer *user_model.User, delTag bool) error {
 	if delTag {
 		protectedTags, err := git_model.GetProtectedTags(ctx, rel.RepoID)
 		if err != nil {
@@ -335,28 +333,29 @@ func DeleteReleaseByID(ctx context.Context, id int64, doer *user_model.User, del
 		}
 
 		refName := git.RefNameFromTag(rel.TagName)
+		objectFormat := git.ObjectFormatFromName(repo.ObjectFormatName)
 		notify_service.PushCommits(
 			ctx, doer, repo,
 			&repository.PushUpdateOptions{
 				RefFullName: refName,
 				OldCommitID: rel.Sha1,
-				NewCommitID: git.EmptySHA,
+				NewCommitID: objectFormat.EmptyObjectID().String(),
 			}, repository.NewPushCommits())
 		notify_service.DeleteRef(ctx, doer, repo, refName)
 
-		if err := repo_model.DeleteReleaseByID(ctx, id); err != nil {
+		if _, err := db.DeleteByID[repo_model.Release](ctx, rel.ID); err != nil {
 			return fmt.Errorf("DeleteReleaseByID: %w", err)
 		}
 	} else {
 		rel.IsTag = true
 
-		if err = repo_model.UpdateRelease(ctx, rel); err != nil {
+		if err := repo_model.UpdateRelease(ctx, rel); err != nil {
 			return fmt.Errorf("Update: %w", err)
 		}
 	}
 
 	rel.Repo = repo
-	if err = rel.LoadAttributes(ctx); err != nil {
+	if err := rel.LoadAttributes(ctx); err != nil {
 		return fmt.Errorf("LoadAttributes: %w", err)
 	}
 
@@ -371,7 +370,13 @@ func DeleteReleaseByID(ctx context.Context, id int64, doer *user_model.User, del
 		}
 	}
 
-	notify_service.DeleteRelease(ctx, doer, rel)
-
+	if !rel.IsDraft {
+		notify_service.DeleteRelease(ctx, doer, rel)
+	}
 	return nil
+}
+
+// Init start release service
+func Init() error {
+	return initTagSyncQueue(graceful.GetManager().ShutdownContext())
 }

@@ -5,15 +5,15 @@ package actions
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"code.gitea.io/gitea/models/db"
 	repo_model "code.gitea.io/gitea/models/repo"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/timeutil"
+	"code.gitea.io/gitea/modules/util"
 	webhook_module "code.gitea.io/gitea/modules/webhook"
-
-	"github.com/robfig/cron/v3"
 )
 
 // ActionSchedule represents a schedule of a workflow file
@@ -52,8 +52,6 @@ func GetReposMapByIDs(ctx context.Context, ids []int64) (map[int64]*repo_model.R
 	return repos, db.GetEngine(ctx).In("id", ids).Find(&repos)
 }
 
-var cronParser = cron.NewParser(cron.Minute | cron.Hour | cron.Dom | cron.Month | cron.Dow | cron.Descriptor)
-
 // CreateScheduleTask creates new schedule task.
 func CreateScheduleTask(ctx context.Context, rows []*ActionSchedule) error {
 	// Return early if there are no rows to insert
@@ -70,6 +68,7 @@ func CreateScheduleTask(ctx context.Context, rows []*ActionSchedule) error {
 
 	// Loop through each schedule row
 	for _, row := range rows {
+		row.Title, _ = util.SplitStringAtByteN(row.Title, 255)
 		// Create new schedule row
 		if err = db.Insert(ctx, row); err != nil {
 			return err
@@ -79,19 +78,21 @@ func CreateScheduleTask(ctx context.Context, rows []*ActionSchedule) error {
 		now := time.Now()
 
 		for _, spec := range row.Specs {
+			specRow := &ActionScheduleSpec{
+				RepoID:     row.RepoID,
+				ScheduleID: row.ID,
+				Spec:       spec,
+			}
 			// Parse the spec and check for errors
-			schedule, err := cronParser.Parse(spec)
+			schedule, err := specRow.Parse()
 			if err != nil {
 				continue // skip to the next spec if there's an error
 			}
 
+			specRow.Next = timeutil.TimeStamp(schedule.Next(now).Unix())
+
 			// Insert the new schedule spec row
-			if err = db.Insert(ctx, &ActionScheduleSpec{
-				RepoID:     row.RepoID,
-				ScheduleID: row.ID,
-				Spec:       spec,
-				Next:       timeutil.TimeStamp(schedule.Next(now).Unix()),
-			}); err != nil {
+			if err = db.Insert(ctx, specRow); err != nil {
 				return err
 			}
 		}
@@ -117,4 +118,23 @@ func DeleteScheduleTaskByRepo(ctx context.Context, id int64) error {
 	}
 
 	return committer.Commit()
+}
+
+func CleanRepoScheduleTasks(ctx context.Context, repo *repo_model.Repository) error {
+	// If actions disabled when there is schedule task, this will remove the outdated schedule tasks
+	// There is no other place we can do this because the app.ini will be changed manually
+	if err := DeleteScheduleTaskByRepo(ctx, repo.ID); err != nil {
+		return fmt.Errorf("DeleteCronTaskByRepo: %v", err)
+	}
+	// cancel running cron jobs of this repository and delete old schedules
+	if err := CancelPreviousJobs(
+		ctx,
+		repo.ID,
+		repo.DefaultBranch,
+		"",
+		webhook_module.HookEventSchedule,
+	); err != nil {
+		return fmt.Errorf("CancelPreviousJobs: %v", err)
+	}
+	return nil
 }

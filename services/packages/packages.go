@@ -18,10 +18,10 @@ import (
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/json"
 	"code.gitea.io/gitea/modules/log"
+	"code.gitea.io/gitea/modules/optional"
 	packages_module "code.gitea.io/gitea/modules/packages"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/storage"
-	"code.gitea.io/gitea/modules/util"
 	notify_service "code.gitea.io/gitea/services/notify"
 )
 
@@ -330,7 +330,7 @@ func CheckCountQuotaExceeded(ctx context.Context, doer, owner *user_model.User) 
 	if setting.Packages.LimitTotalOwnerCount > -1 {
 		totalCount, err := packages_model.CountVersions(ctx, &packages_model.PackageSearchOptions{
 			OwnerID:    owner.ID,
-			IsInternal: util.OptionalBoolFalse,
+			IsInternal: optional.Some(false),
 		})
 		if err != nil {
 			log.Error("CountVersions failed: %v", err)
@@ -355,6 +355,8 @@ func CheckSizeQuotaExceeded(ctx context.Context, doer, owner *user_model.User, p
 	switch packageType {
 	case packages_model.TypeAlpine:
 		typeSpecificSize = setting.Packages.LimitSizeAlpine
+	case packages_model.TypeArch:
+		typeSpecificSize = setting.Packages.LimitSizeArch
 	case packages_model.TypeCargo:
 		typeSpecificSize = setting.Packages.LimitSizeCargo
 	case packages_model.TypeChef:
@@ -596,12 +598,12 @@ func GetPackageFileStream(ctx context.Context, pf *packages_model.PackageFile) (
 		return nil, nil, nil, err
 	}
 
-	return GetPackageBlobStream(ctx, pf, pb)
+	return GetPackageBlobStream(ctx, pf, pb, nil)
 }
 
 // GetPackageBlobStream returns the content of the specific package blob
 // If the storage supports direct serving and it's enabled, only the direct serving url is returned.
-func GetPackageBlobStream(ctx context.Context, pf *packages_model.PackageFile, pb *packages_model.PackageBlob) (io.ReadSeekCloser, *url.URL, *packages_model.PackageFile, error) {
+func GetPackageBlobStream(ctx context.Context, pf *packages_model.PackageFile, pb *packages_model.PackageBlob, serveDirectReqParams url.Values) (io.ReadSeekCloser, *url.URL, *packages_model.PackageFile, error) {
 	key := packages_module.BlobHash256Key(pb.HashSHA256)
 
 	cs := packages_module.NewContentStore()
@@ -611,7 +613,7 @@ func GetPackageBlobStream(ctx context.Context, pf *packages_model.PackageFile, p
 	var err error
 
 	if cs.ShouldServeDirect() {
-		u, err = cs.GetServeDirectURL(key, pf.Name)
+		u, err = cs.GetServeDirectURL(key, pf.Name, serveDirectReqParams)
 		if err != nil && !errors.Is(err, storage.ErrURLNotSupported) {
 			log.Error("Error getting serve direct url: %v", err)
 		}
@@ -640,7 +642,7 @@ func RemoveAllPackages(ctx context.Context, userID int64) (int, error) {
 				Page:     1,
 			},
 			OwnerID:    userID,
-			IsInternal: util.OptionalBoolNone,
+			IsInternal: optional.None[bool](),
 		})
 		if err != nil {
 			return count, fmt.Errorf("GetOwnedPackages[%d]: %w", userID, err)

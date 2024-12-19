@@ -4,13 +4,12 @@
 package repo
 
 import (
-	"net/http"
 	"strings"
 
 	"code.gitea.io/gitea/models/db"
 	issues_model "code.gitea.io/gitea/models/issues"
-	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/eventsource"
+	"code.gitea.io/gitea/services/context"
 )
 
 // IssueStopwatch creates or stops a stopwatch for the given issue.
@@ -40,8 +39,7 @@ func IssueStopwatch(c *context.Context) {
 		c.Flash.Success(c.Tr("repo.issues.tracker_auto_close"))
 	}
 
-	url := issue.Link()
-	c.Redirect(url, http.StatusSeeOther)
+	c.JSONRedirect("")
 }
 
 // CancelStopwatch cancel the stopwatch
@@ -72,8 +70,7 @@ func CancelStopwatch(c *context.Context) {
 		})
 	}
 
-	url := issue.Link()
-	c.Redirect(url, http.StatusSeeOther)
+	c.JSONRedirect("")
 }
 
 // GetActiveStopwatch is the middleware that sets .ActiveStopwatch on context

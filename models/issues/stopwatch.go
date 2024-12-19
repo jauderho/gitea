@@ -29,20 +29,6 @@ func (err ErrIssueStopwatchNotExist) Unwrap() error {
 	return util.ErrNotExist
 }
 
-// ErrIssueStopwatchAlreadyExist represents an error that stopwatch is already exist
-type ErrIssueStopwatchAlreadyExist struct {
-	UserID  int64
-	IssueID int64
-}
-
-func (err ErrIssueStopwatchAlreadyExist) Error() string {
-	return fmt.Sprintf("issue stopwatch already exists[uid: %d, issue_id: %d", err.UserID, err.IssueID)
-}
-
-func (err ErrIssueStopwatchAlreadyExist) Unwrap() error {
-	return util.ErrAlreadyExist
-}
-
 // Stopwatch represents a stopwatch for time tracking.
 type Stopwatch struct {
 	ID          int64              `xorm:"pk autoincr"`
@@ -110,7 +96,7 @@ func GetUIDsAndStopwatch(ctx context.Context) ([]*UserStopwatch, error) {
 func GetUserStopwatches(ctx context.Context, userID int64, listOptions db.ListOptions) ([]*Stopwatch, error) {
 	sws := make([]*Stopwatch, 0, 8)
 	sess := db.GetEngine(ctx).Where("stopwatch.user_id = ?", userID)
-	if listOptions.Page != 0 {
+	if listOptions.Page > 0 {
 		sess = db.SetSessionPagination(sess, &listOptions)
 	}
 

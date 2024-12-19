@@ -7,6 +7,7 @@ package issues
 import (
 	"context"
 	"fmt"
+	"html/template"
 	"regexp"
 	"slices"
 
@@ -93,33 +94,42 @@ func (err ErrIssueWasClosed) Error() string {
 	return fmt.Sprintf("Issue [%d] %d was already closed", err.ID, err.Index)
 }
 
+var ErrIssueAlreadyChanged = util.NewInvalidArgumentErrorf("the issue is already changed")
+
 // Issue represents an issue or pull request of repository.
 type Issue struct {
-	ID               int64                  `xorm:"pk autoincr"`
-	RepoID           int64                  `xorm:"INDEX UNIQUE(repo_index)"`
-	Repo             *repo_model.Repository `xorm:"-"`
-	Index            int64                  `xorm:"UNIQUE(repo_index)"` // Index in one repository.
-	PosterID         int64                  `xorm:"INDEX"`
-	Poster           *user_model.User       `xorm:"-"`
-	OriginalAuthor   string
-	OriginalAuthorID int64                  `xorm:"index"`
-	Title            string                 `xorm:"name"`
-	Content          string                 `xorm:"LONGTEXT"`
-	RenderedContent  string                 `xorm:"-"`
-	Labels           []*Label               `xorm:"-"`
-	MilestoneID      int64                  `xorm:"INDEX"`
-	Milestone        *Milestone             `xorm:"-"`
-	Project          *project_model.Project `xorm:"-"`
-	Priority         int
-	AssigneeID       int64            `xorm:"-"`
-	Assignee         *user_model.User `xorm:"-"`
-	IsClosed         bool             `xorm:"INDEX"`
-	IsRead           bool             `xorm:"-"`
-	IsPull           bool             `xorm:"INDEX"` // Indicates whether is a pull request or not.
-	PullRequest      *PullRequest     `xorm:"-"`
-	NumComments      int
-	Ref              string
-	PinOrder         int `xorm:"DEFAULT 0"`
+	ID                int64                  `xorm:"pk autoincr"`
+	RepoID            int64                  `xorm:"INDEX UNIQUE(repo_index)"`
+	Repo              *repo_model.Repository `xorm:"-"`
+	Index             int64                  `xorm:"UNIQUE(repo_index)"` // Index in one repository.
+	PosterID          int64                  `xorm:"INDEX"`
+	Poster            *user_model.User       `xorm:"-"`
+	OriginalAuthor    string
+	OriginalAuthorID  int64                  `xorm:"index"`
+	Title             string                 `xorm:"name"`
+	Content           string                 `xorm:"LONGTEXT"`
+	RenderedContent   template.HTML          `xorm:"-"`
+	ContentVersion    int                    `xorm:"NOT NULL DEFAULT 0"`
+	Labels            []*Label               `xorm:"-"`
+	isLabelsLoaded    bool                   `xorm:"-"`
+	MilestoneID       int64                  `xorm:"INDEX"`
+	Milestone         *Milestone             `xorm:"-"`
+	isMilestoneLoaded bool                   `xorm:"-"`
+	Project           *project_model.Project `xorm:"-"`
+	Priority          int
+	AssigneeID        int64            `xorm:"-"`
+	Assignee          *user_model.User `xorm:"-"`
+	isAssigneeLoaded  bool             `xorm:"-"`
+	IsClosed          bool             `xorm:"INDEX"`
+	IsRead            bool             `xorm:"-"`
+	IsPull            bool             `xorm:"INDEX"` // Indicates whether is a pull request or not.
+	PullRequest       *PullRequest     `xorm:"-"`
+	NumComments       int
+
+	// TODO: RemoveIssueRef: see "repo/issue/branch_selector_field.tmpl"
+	Ref string
+
+	PinOrder int `xorm:"DEFAULT 0"`
 
 	DeadlineUnix timeutil.TimeStamp `xorm:"INDEX"`
 
@@ -127,11 +137,12 @@ type Issue struct {
 	UpdatedUnix timeutil.TimeStamp `xorm:"INDEX updated"`
 	ClosedUnix  timeutil.TimeStamp `xorm:"INDEX"`
 
-	Attachments      []*repo_model.Attachment `xorm:"-"`
-	Comments         CommentList              `xorm:"-"`
-	Reactions        ReactionList             `xorm:"-"`
-	TotalTrackedTime int64                    `xorm:"-"`
-	Assignees        []*user_model.User       `xorm:"-"`
+	Attachments         []*repo_model.Attachment `xorm:"-"`
+	isAttachmentsLoaded bool                     `xorm:"-"`
+	Comments            CommentList              `xorm:"-"`
+	Reactions           ReactionList             `xorm:"-"`
+	TotalTrackedTime    int64                    `xorm:"-"`
+	Assignees           []*user_model.User       `xorm:"-"`
 
 	// IsLocked limits commenting abilities to users on an issue
 	// with write access
@@ -139,25 +150,20 @@ type Issue struct {
 
 	// For view issue page.
 	ShowRole RoleDescriptor `xorm:"-"`
+
+	// Time estimate
+	TimeEstimate int64 `xorm:"NOT NULL DEFAULT 0"`
 }
 
 var (
-	issueTasksPat     *regexp.Regexp
-	issueTasksDonePat *regexp.Regexp
-)
-
-const (
-	issueTasksRegexpStr     = `(^\s*[-*]\s\[[\sxX]\]\s.)|(\n\s*[-*]\s\[[\sxX]\]\s.)`
-	issueTasksDoneRegexpStr = `(^\s*[-*]\s\[[xX]\]\s.)|(\n\s*[-*]\s\[[xX]\]\s.)`
+	issueTasksPat     = regexp.MustCompile(`(^\s*[-*]\s\[[\sxX]\]\s.)|(\n\s*[-*]\s\[[\sxX]\]\s.)`)
+	issueTasksDonePat = regexp.MustCompile(`(^\s*[-*]\s\[[xX]\]\s.)|(\n\s*[-*]\s\[[xX]\]\s.)`)
 )
 
 // IssueIndex represents the issue index table
 type IssueIndex db.ResourceIndex
 
 func init() {
-	issueTasksPat = regexp.MustCompile(issueTasksRegexpStr)
-	issueTasksDonePat = regexp.MustCompile(issueTasksDoneRegexpStr)
-
 	db.RegisterModel(new(Issue))
 	db.RegisterModel(new(IssueIndex))
 }
@@ -191,6 +197,19 @@ func (issue *Issue) LoadRepo(ctx context.Context) (err error) {
 	return nil
 }
 
+func (issue *Issue) LoadAttachments(ctx context.Context) (err error) {
+	if issue.isAttachmentsLoaded || issue.Attachments != nil {
+		return nil
+	}
+
+	issue.Attachments, err = repo_model.GetAttachmentsByIssueID(ctx, issue.ID)
+	if err != nil {
+		return fmt.Errorf("getAttachmentsByIssueID [%d]: %w", issue.ID, err)
+	}
+	issue.isAttachmentsLoaded = true
+	return nil
+}
+
 // IsTimetrackerEnabled returns true if the repo enables timetracking
 func (issue *Issue) IsTimetrackerEnabled(ctx context.Context) bool {
 	if err := issue.LoadRepo(ctx); err != nil {
@@ -198,20 +217,6 @@ func (issue *Issue) IsTimetrackerEnabled(ctx context.Context) bool {
 		return false
 	}
 	return issue.Repo.IsTimetrackerEnabled(ctx)
-}
-
-// GetPullRequest returns the issue pull request
-func (issue *Issue) GetPullRequest(ctx context.Context) (pr *PullRequest, err error) {
-	if !issue.IsPull {
-		return nil, fmt.Errorf("Issue is not a pull request")
-	}
-
-	pr, err = GetPullRequestByIssueID(ctx, issue.ID)
-	if err != nil {
-		return nil, err
-	}
-	pr.Issue = issue
-	return pr, err
 }
 
 // LoadPoster loads poster
@@ -305,11 +310,12 @@ func (issue *Issue) loadReactions(ctx context.Context) (err error) {
 
 // LoadMilestone load milestone of this issue.
 func (issue *Issue) LoadMilestone(ctx context.Context) (err error) {
-	if (issue.Milestone == nil || issue.Milestone.ID != issue.MilestoneID) && issue.MilestoneID > 0 {
+	if !issue.isMilestoneLoaded && (issue.Milestone == nil || issue.Milestone.ID != issue.MilestoneID) && issue.MilestoneID > 0 {
 		issue.Milestone, err = GetMilestoneByRepoID(ctx, issue.RepoID, issue.MilestoneID)
 		if err != nil && !IsErrMilestoneNotExist(err) {
 			return fmt.Errorf("getMilestoneByRepoID [repo_id: %d, milestone_id: %d]: %w", issue.RepoID, issue.MilestoneID, err)
 		}
+		issue.isMilestoneLoaded = true
 	}
 	return nil
 }
@@ -345,11 +351,8 @@ func (issue *Issue) LoadAttributes(ctx context.Context) (err error) {
 		return err
 	}
 
-	if issue.Attachments == nil {
-		issue.Attachments, err = repo_model.GetAttachmentsByIssueID(ctx, issue.ID)
-		if err != nil {
-			return fmt.Errorf("getAttachmentsByIssueID [%d]: %w", issue.ID, err)
-		}
+	if err = issue.LoadAttachments(ctx); err != nil {
+		return err
 	}
 
 	if err = issue.loadComments(ctx); err != nil {
@@ -366,6 +369,13 @@ func (issue *Issue) LoadAttributes(ctx context.Context) (err error) {
 	}
 
 	return issue.loadReactions(ctx)
+}
+
+func (issue *Issue) ResetAttributesLoaded() {
+	issue.isLabelsLoaded = false
+	issue.isMilestoneLoaded = false
+	issue.isAttachmentsLoaded = false
+	issue.isAssigneeLoaded = false
 }
 
 // GetIsRead load the `IsRead` field of the issue
@@ -542,15 +552,6 @@ func GetIssueByID(ctx context.Context, id int64) (*Issue, error) {
 	return issue, nil
 }
 
-// GetIssueWithAttrsByID returns an issue with attributes by given ID.
-func GetIssueWithAttrsByID(ctx context.Context, id int64) (*Issue, error) {
-	issue, err := GetIssueByID(ctx, id)
-	if err != nil {
-		return nil, err
-	}
-	return issue, issue.LoadAttributes(ctx)
-}
-
 // GetIssuesByIDs return issues with the given IDs.
 // If keepOrder is true, the order of the returned issues will be the same as the given IDs.
 func GetIssuesByIDs(ctx context.Context, issueIDs []int64, keepOrder ...bool) (IssueList, error) {
@@ -646,7 +647,7 @@ func (issue *Issue) BlockedByDependencies(ctx context.Context, opts db.ListOptio
 		Where("issue_id = ?", issue.ID).
 		// sort by repo id then created date, with the issues of the same repo at the beginning of the list
 		OrderBy("CASE WHEN issue.repo_id = ? THEN 0 ELSE issue.repo_id END, issue.created_unix DESC", issue.RepoID)
-	if opts.Page != 0 {
+	if opts.Page > 0 {
 		sess = db.SetSessionPagination(sess, &opts)
 	}
 	err = sess.Find(&issueDeps)
@@ -877,7 +878,7 @@ func GetPinnedIssues(ctx context.Context, repoID int64, isPull bool) (IssueList,
 	return issues, nil
 }
 
-// IsNewPinnedAllowed returns if a new Issue or Pull request can be pinned
+// IsNewPinAllowed returns if a new Issue or Pull request can be pinned
 func IsNewPinAllowed(ctx context.Context, repoID int64, isPull bool) (bool, error) {
 	var maxPin int
 	_, err := db.GetEngine(ctx).SQL("SELECT COUNT(pin_order) FROM issue WHERE repo_id = ? AND is_pull = ? AND pin_order > 0", repoID, isPull).Get(&maxPin)
@@ -938,4 +939,29 @@ func insertIssue(ctx context.Context, issue *Issue) error {
 	}
 
 	return nil
+}
+
+// ChangeIssueTimeEstimate changes the plan time of this issue, as the given user.
+func ChangeIssueTimeEstimate(ctx context.Context, issue *Issue, doer *user_model.User, timeEstimate int64) error {
+	return db.WithTx(ctx, func(ctx context.Context) error {
+		if err := UpdateIssueCols(ctx, &Issue{ID: issue.ID, TimeEstimate: timeEstimate}, "time_estimate"); err != nil {
+			return fmt.Errorf("updateIssueCols: %w", err)
+		}
+
+		if err := issue.LoadRepo(ctx); err != nil {
+			return fmt.Errorf("loadRepo: %w", err)
+		}
+
+		opts := &CreateCommentOptions{
+			Type:    CommentTypeChangeTimeEstimate,
+			Doer:    doer,
+			Repo:    issue.Repo,
+			Issue:   issue,
+			Content: fmt.Sprintf("%d", timeEstimate),
+		}
+		if _, err := CreateComment(ctx, opts); err != nil {
+			return fmt.Errorf("createComment: %w", err)
+		}
+		return nil
+	})
 }

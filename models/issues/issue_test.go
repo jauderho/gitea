@@ -16,6 +16,7 @@ import (
 	repo_model "code.gitea.io/gitea/models/repo"
 	"code.gitea.io/gitea/models/unittest"
 	user_model "code.gitea.io/gitea/models/user"
+	"code.gitea.io/gitea/modules/optional"
 	"code.gitea.io/gitea/modules/setting"
 
 	"github.com/stretchr/testify/assert"
@@ -155,7 +156,7 @@ func TestIssues(t *testing.T) {
 	}{
 		{
 			issues_model.IssuesOptions{
-				AssigneeID: 1,
+				AssigneeID: optional.Some(int64(1)),
 				SortType:   "oldest",
 			},
 			[]int64{1, 6},
@@ -216,36 +217,6 @@ func TestIssue_loadTotalTimes(t *testing.T) {
 	assert.Equal(t, int64(3682), ms.TotalTrackedTime)
 }
 
-func TestGetRepoIDsForIssuesOptions(t *testing.T) {
-	assert.NoError(t, unittest.PrepareTestDatabase())
-	user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: 2})
-	for _, test := range []struct {
-		Opts            issues_model.IssuesOptions
-		ExpectedRepoIDs []int64
-	}{
-		{
-			issues_model.IssuesOptions{
-				AssigneeID: 2,
-			},
-			[]int64{3, 32},
-		},
-		{
-			issues_model.IssuesOptions{
-				RepoCond: builder.In("repo_id", 1, 2),
-			},
-			[]int64{1, 2},
-		},
-	} {
-		repoIDs, err := issues_model.GetRepoIDsForIssuesOptions(db.DefaultContext, &test.Opts, user)
-		assert.NoError(t, err)
-		if assert.Len(t, repoIDs, len(test.ExpectedRepoIDs)) {
-			for i, repoID := range repoIDs {
-				assert.EqualValues(t, test.ExpectedRepoIDs[i], repoID)
-			}
-		}
-	}
-}
-
 func testInsertIssue(t *testing.T, title, content string, expectIndex int64) *issues_model.Issue {
 	var newIssue issues_model.Issue
 	t.Run(title, func(t *testing.T) {
@@ -279,11 +250,11 @@ func TestIssue_InsertIssue(t *testing.T) {
 
 	// there are 5 issues and max index is 5 on repository 1, so this one should 6
 	issue := testInsertIssue(t, "my issue1", "special issue's comments?", 6)
-	_, err := db.GetEngine(db.DefaultContext).ID(issue.ID).Delete(new(issues_model.Issue))
+	_, err := db.DeleteByID[issues_model.Issue](db.DefaultContext, issue.ID)
 	assert.NoError(t, err)
 
 	issue = testInsertIssue(t, `my issue2, this is my son's love \n \r \ `, "special issue's '' comments?", 7)
-	_, err = db.GetEngine(db.DefaultContext).ID(issue.ID).Delete(new(issues_model.Issue))
+	_, err = db.DeleteByID[issues_model.Issue](db.DefaultContext, issue.ID)
 	assert.NoError(t, err)
 }
 
@@ -409,7 +380,7 @@ func TestCountIssues(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
 	count, err := issues_model.CountIssues(db.DefaultContext, &issues_model.IssuesOptions{})
 	assert.NoError(t, err)
-	assert.EqualValues(t, 20, count)
+	assert.EqualValues(t, 22, count)
 }
 
 func TestIssueLoadAttributes(t *testing.T) {
@@ -463,7 +434,7 @@ func assertCreateIssues(t *testing.T, isPull bool) {
 	owner := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: repo.OwnerID})
 	label := unittest.AssertExistsAndLoadBean(t, &issues_model.Label{ID: 1})
 	milestone := unittest.AssertExistsAndLoadBean(t, &issues_model.Milestone{ID: 1})
-	assert.EqualValues(t, milestone.ID, 1)
+	assert.EqualValues(t, 1, milestone.ID)
 	reaction := &issues_model.Reaction{
 		Type:   "heart",
 		UserID: owner.ID,

@@ -9,6 +9,7 @@ import (
 	"code.gitea.io/gitea/models/db"
 
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"xorm.io/builder"
 )
 
@@ -64,10 +65,10 @@ func BeanExists(t assert.TestingT, bean any, conditions ...any) bool {
 }
 
 // AssertExistsAndLoadBean assert that a bean exists and load it from the test database
-func AssertExistsAndLoadBean[T any](t assert.TestingT, bean T, conditions ...any) T {
+func AssertExistsAndLoadBean[T any](t require.TestingT, bean T, conditions ...any) T {
 	exists, err := LoadBeanIfExists(bean, conditions...)
-	assert.NoError(t, err)
-	assert.True(t, exists,
+	require.NoError(t, err)
+	require.True(t, exists,
 		"Expected to find %+v (of type %T, with conditions %+v), but did not",
 		bean, bean, conditions)
 	return bean
@@ -78,7 +79,7 @@ func AssertExistsAndLoadMap(t assert.TestingT, table string, conditions ...any) 
 	e := db.GetEngine(db.DefaultContext).Table(table)
 	res, err := whereOrderConditions(e, conditions).Query()
 	assert.NoError(t, err)
-	assert.True(t, len(res) == 1,
+	assert.Len(t, res, 1,
 		"Expected to find one row in %s (with conditions %+v), but found %d",
 		table, conditions, len(res),
 	)
@@ -131,8 +132,8 @@ func AssertSuccessfulInsert(t assert.TestingT, beans ...any) {
 }
 
 // AssertCount assert the count of a bean
-func AssertCount(t assert.TestingT, bean, expected any) {
-	assert.EqualValues(t, expected, GetCount(t, bean))
+func AssertCount(t assert.TestingT, bean, expected any) bool {
+	return assert.EqualValues(t, expected, GetCount(t, bean))
 }
 
 // AssertInt64InRange assert value is in range [low, high]
@@ -150,7 +151,7 @@ func GetCountByCond(t assert.TestingT, tableName string, cond builder.Cond) int6
 }
 
 // AssertCountByCond test the count of database entries matching bean
-func AssertCountByCond(t assert.TestingT, tableName string, cond builder.Cond, expected int) {
-	assert.EqualValues(t, expected, GetCountByCond(t, tableName, cond),
+func AssertCountByCond(t assert.TestingT, tableName string, cond builder.Cond, expected int) bool {
+	return assert.EqualValues(t, expected, GetCountByCond(t, tableName, cond),
 		"Failed consistency test, the counted bean (of table %s) was %+v", tableName, cond)
 }

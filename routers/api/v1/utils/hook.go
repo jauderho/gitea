@@ -6,16 +6,18 @@ package utils
 import (
 	"fmt"
 	"net/http"
+	"strconv"
 	"strings"
 
+	"code.gitea.io/gitea/models/db"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/models/webhook"
-	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/json"
 	"code.gitea.io/gitea/modules/setting"
 	api "code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/util"
 	webhook_module "code.gitea.io/gitea/modules/webhook"
+	"code.gitea.io/gitea/services/context"
 	webhook_service "code.gitea.io/gitea/services/webhook"
 )
 
@@ -26,13 +28,7 @@ func ListOwnerHooks(ctx *context.APIContext, owner *user_model.User) {
 		OwnerID:     owner.ID,
 	}
 
-	count, err := webhook.CountWebhooksByOpts(ctx, opts)
-	if err != nil {
-		ctx.InternalServerError(err)
-		return
-	}
-
-	hooks, err := webhook.ListWebhooksByOpts(ctx, opts)
+	hooks, count, err := db.FindAndCount[webhook.Webhook](ctx, opts)
 	if err != nil {
 		ctx.InternalServerError(err)
 		return
@@ -104,7 +100,7 @@ func checkCreateHookOption(ctx *context.APIContext, form *api.CreateHookOption) 
 func AddSystemHook(ctx *context.APIContext, form *api.CreateHookOption) {
 	hook, ok := addHook(ctx, form, 0, 0)
 	if ok {
-		h, err := webhook_service.ToHook(setting.AppSubURL+"/admin", hook)
+		h, err := webhook_service.ToHook(setting.AppSubURL+"/-/admin", hook)
 		if err != nil {
 			ctx.Error(http.StatusInternalServerError, "convert.ToHook", err)
 			return
@@ -162,6 +158,7 @@ func pullHook(events []string, event string) bool {
 // addHook add the hook specified by `form`, `ownerID` and `repoID`. If there is
 // an error, write to `ctx` accordingly. Return (webhook, ok)
 func addHook(ctx *context.APIContext, form *api.CreateHookOption, ownerID, repoID int64) (*webhook.Webhook, bool) {
+	var isSystemWebhook bool
 	if !checkCreateHookOption(ctx, form) {
 		return nil, false
 	}
@@ -169,13 +166,22 @@ func addHook(ctx *context.APIContext, form *api.CreateHookOption, ownerID, repoI
 	if len(form.Events) == 0 {
 		form.Events = []string{"push"}
 	}
+	if form.Config["is_system_webhook"] != "" {
+		sw, err := strconv.ParseBool(form.Config["is_system_webhook"])
+		if err != nil {
+			ctx.Error(http.StatusUnprocessableEntity, "", "Invalid is_system_webhook value")
+			return nil, false
+		}
+		isSystemWebhook = sw
+	}
 	w := &webhook.Webhook{
-		OwnerID:     ownerID,
-		RepoID:      repoID,
-		URL:         form.Config["url"],
-		ContentType: webhook.ToHookContentType(form.Config["content_type"]),
-		Secret:      form.Config["secret"],
-		HTTPMethod:  "POST",
+		OwnerID:         ownerID,
+		RepoID:          repoID,
+		URL:             form.Config["url"],
+		ContentType:     webhook.ToHookContentType(form.Config["content_type"]),
+		Secret:          form.Config["secret"],
+		HTTPMethod:      "POST",
+		IsSystemWebhook: isSystemWebhook,
 		HookEvent: &webhook_module.HookEvent{
 			ChooseEvents: true,
 			HookEvents: webhook_module.HookEvents{
@@ -262,7 +268,7 @@ func EditSystemHook(ctx *context.APIContext, form *api.EditHookOption, hookID in
 		ctx.Error(http.StatusInternalServerError, "GetSystemOrDefaultWebhook", err)
 		return
 	}
-	h, err := webhook_service.ToHook(setting.AppURL+"/admin", updated)
+	h, err := webhook_service.ToHook(setting.AppURL+"/-/admin", updated)
 	if err != nil {
 		ctx.Error(http.StatusInternalServerError, "convert.ToHook", err)
 		return

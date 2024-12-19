@@ -10,10 +10,10 @@ import (
 
 	issues_model "code.gitea.io/gitea/models/issues"
 	"code.gitea.io/gitea/models/unittest"
-	"code.gitea.io/gitea/modules/contexttest"
 	"code.gitea.io/gitea/modules/repository"
 	"code.gitea.io/gitea/modules/test"
 	"code.gitea.io/gitea/modules/web"
+	"code.gitea.io/gitea/services/contexttest"
 	"code.gitea.io/gitea/services/forms"
 
 	"github.com/stretchr/testify/assert"
@@ -62,7 +62,7 @@ func TestRetrieveLabels(t *testing.T) {
 		contexttest.LoadUser(t, ctx, 2)
 		contexttest.LoadRepo(t, ctx, testCase.RepoID)
 		ctx.Req.Form.Set("sort", testCase.Sort)
-		RetrieveLabels(ctx)
+		RetrieveLabelsForList(ctx)
 		assert.False(t, ctx.Written())
 		labels, ok := ctx.Data["Labels"].([]*issues_model.Label)
 		assert.True(t, ok)
@@ -123,7 +123,7 @@ func TestDeleteLabel(t *testing.T) {
 	assert.EqualValues(t, http.StatusOK, ctx.Resp.Status())
 	unittest.AssertNotExistsBean(t, &issues_model.Label{ID: 2})
 	unittest.AssertNotExistsBean(t, &issues_model.IssueLabel{LabelID: 2})
-	assert.Equal(t, ctx.Tr("repo.issues.label_deletion_success"), ctx.Flash.SuccessMsg)
+	assert.EqualValues(t, ctx.Tr("repo.issues.label_deletion_success"), ctx.Flash.SuccessMsg)
 }
 
 func TestUpdateIssueLabel_Clear(t *testing.T) {

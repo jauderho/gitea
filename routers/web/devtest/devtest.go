@@ -10,8 +10,8 @@ import (
 	"time"
 
 	"code.gitea.io/gitea/modules/base"
-	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/templates"
+	"code.gitea.io/gitea/services/context"
 )
 
 // List all devtest templates, they will be used for e2e tests for the UI components
@@ -24,12 +24,12 @@ func List(ctx *context.Context) {
 	var subNames []string
 	for _, tmplName := range templateNames {
 		subName := strings.TrimSuffix(tmplName, ".tmpl")
-		if subName != "list" {
+		if !strings.HasPrefix(subName, "devtest-") {
 			subNames = append(subNames, subName)
 		}
 	}
 	ctx.Data["SubNames"] = subNames
-	ctx.HTML(http.StatusOK, "devtest/list")
+	ctx.HTML(http.StatusOK, "devtest/devtest-list")
 }
 
 func FetchActionTest(ctx *context.Context) {
@@ -62,5 +62,5 @@ func Tmpl(ctx *context.Context) {
 		time.Sleep(2 * time.Second)
 	}
 
-	ctx.HTML(http.StatusOK, base.TplName("devtest"+path.Clean("/"+ctx.Params("sub"))))
+	ctx.HTML(http.StatusOK, base.TplName("devtest"+path.Clean("/"+ctx.PathParam("sub"))))
 }

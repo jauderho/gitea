@@ -4,7 +4,6 @@
 package activities_test
 
 import (
-	"fmt"
 	"testing"
 	"time"
 
@@ -59,8 +58,8 @@ func TestGetUserHeatmapDataByUser(t *testing.T) {
 	assert.NoError(t, unittest.PrepareTestDatabase())
 
 	// Mock time
-	timeutil.Set(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
-	defer timeutil.Unset()
+	timeutil.MockSet(time.Date(2021, 1, 1, 0, 0, 0, 0, time.UTC))
+	defer timeutil.MockUnset()
 
 	for _, tc := range testCases {
 		user := unittest.AssertExistsAndLoadBean(t, &user_model.User{ID: tc.userID})
@@ -91,11 +90,11 @@ func TestGetUserHeatmapDataByUser(t *testing.T) {
 		assert.NoError(t, err)
 		assert.Len(t, actions, contributions, "invalid action count: did the test data became too old?")
 		assert.Equal(t, count, int64(contributions))
-		assert.Equal(t, tc.CountResult, contributions, fmt.Sprintf("testcase '%s'", tc.desc))
+		assert.Equal(t, tc.CountResult, contributions, "testcase '%s'", tc.desc)
 
 		// Test JSON rendering
 		jsonData, err := json.Marshal(heatmap)
 		assert.NoError(t, err)
-		assert.Equal(t, tc.JSONResult, string(jsonData))
+		assert.JSONEq(t, tc.JSONResult, string(jsonData))
 	}
 }

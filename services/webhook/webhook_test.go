@@ -21,11 +21,11 @@ func TestWebhook_GetSlackHook(t *testing.T) {
 		Meta: `{"channel": "foo", "username": "username", "color": "blue"}`,
 	}
 	slackHook := GetSlackHook(w)
-	assert.Equal(t, *slackHook, SlackMeta{
+	assert.Equal(t, SlackMeta{
 		Channel:  "foo",
 		Username: "username",
 		Color:    "blue",
-	})
+	}, *slackHook)
 }
 
 func TestPrepareWebhooks(t *testing.T) {
@@ -77,7 +77,3 @@ func TestPrepareWebhooksBranchFilterNoMatch(t *testing.T) {
 		unittest.AssertNotExistsBean(t, hookTask)
 	}
 }
-
-// TODO TestHookTask_deliver
-
-// TODO TestDeliverHooks

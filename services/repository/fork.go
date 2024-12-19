@@ -12,13 +12,17 @@ import (
 	"code.gitea.io/gitea/models/db"
 	git_model "code.gitea.io/gitea/models/git"
 	repo_model "code.gitea.io/gitea/models/repo"
+	"code.gitea.io/gitea/models/unit"
 	user_model "code.gitea.io/gitea/models/user"
 	"code.gitea.io/gitea/modules/git"
+	"code.gitea.io/gitea/modules/gitrepo"
 	"code.gitea.io/gitea/modules/log"
 	repo_module "code.gitea.io/gitea/modules/repository"
 	"code.gitea.io/gitea/modules/structs"
 	"code.gitea.io/gitea/modules/util"
 	notify_service "code.gitea.io/gitea/services/notify"
+
+	"xorm.io/builder"
 )
 
 // ErrForkAlreadyExist represents a "ForkAlreadyExist" kind of error.
@@ -52,6 +56,14 @@ type ForkRepoOptions struct {
 
 // ForkRepository forks a repository
 func ForkRepository(ctx context.Context, doer, owner *user_model.User, opts ForkRepoOptions) (*repo_model.Repository, error) {
+	if err := opts.BaseRepo.LoadOwner(ctx); err != nil {
+		return nil, err
+	}
+
+	if user_model.IsUserBlockedBy(ctx, doer, opts.BaseRepo.Owner.ID) {
+		return nil, user_model.ErrBlockedUser
+	}
+
 	// Fork is prohibited, if user has reached maximum limit of repositories
 	if !owner.CanForkRepo() {
 		return nil, repo_model.ErrReachLimitOfRepo{
@@ -76,17 +88,18 @@ func ForkRepository(ctx context.Context, doer, owner *user_model.User, opts Fork
 		defaultBranch = opts.SingleBranch
 	}
 	repo := &repo_model.Repository{
-		OwnerID:       owner.ID,
-		Owner:         owner,
-		OwnerName:     owner.Name,
-		Name:          opts.Name,
-		LowerName:     strings.ToLower(opts.Name),
-		Description:   opts.Description,
-		DefaultBranch: defaultBranch,
-		IsPrivate:     opts.BaseRepo.IsPrivate || opts.BaseRepo.Owner.Visibility == structs.VisibleTypePrivate,
-		IsEmpty:       opts.BaseRepo.IsEmpty,
-		IsFork:        true,
-		ForkID:        opts.BaseRepo.ID,
+		OwnerID:          owner.ID,
+		Owner:            owner,
+		OwnerName:        owner.Name,
+		Name:             opts.Name,
+		LowerName:        strings.ToLower(opts.Name),
+		Description:      opts.Description,
+		DefaultBranch:    defaultBranch,
+		IsPrivate:        opts.BaseRepo.IsPrivate || opts.BaseRepo.Owner.Visibility == structs.VisibleTypePrivate,
+		IsEmpty:          opts.BaseRepo.IsEmpty,
+		IsFork:           true,
+		ForkID:           opts.BaseRepo.ID,
+		ObjectFormatName: opts.BaseRepo.ObjectFormatName,
 	}
 
 	oldRepoPath := opts.BaseRepo.RepoPath()
@@ -124,7 +137,7 @@ func ForkRepository(ctx context.Context, doer, owner *user_model.User, opts Fork
 	}()
 
 	err = db.WithTx(ctx, func(txCtx context.Context) error {
-		if err = repo_module.CreateRepositoryByExample(txCtx, doer, owner, repo, false, true); err != nil {
+		if err = CreateRepositoryByExample(txCtx, doer, owner, repo, false, true); err != nil {
 			return err
 		}
 
@@ -166,7 +179,7 @@ func ForkRepository(ctx context.Context, doer, owner *user_model.User, opts Fork
 			return fmt.Errorf("createDelegateHooks: %w", err)
 		}
 
-		gitRepo, err := git.OpenRepository(txCtx, repo.RepoPath())
+		gitRepo, err := gitrepo.OpenRepository(txCtx, repo)
 		if err != nil {
 			return fmt.Errorf("OpenRepository: %w", err)
 		}
@@ -188,8 +201,11 @@ func ForkRepository(ctx context.Context, doer, owner *user_model.User, opts Fork
 	if err := repo_model.CopyLanguageStat(ctx, opts.BaseRepo, repo); err != nil {
 		log.Error("Copy language stat from oldRepo failed: %v", err)
 	}
+	if err := repo_model.CopyLicense(ctx, opts.BaseRepo, repo); err != nil {
+		return nil, err
+	}
 
-	gitRepo, err := git.OpenRepository(ctx, repo.RepoPath())
+	gitRepo, err := gitrepo.OpenRepository(ctx, repo)
 	if err != nil {
 		log.Error("Open created git repository failed: %v", err)
 	} else {
@@ -233,4 +249,25 @@ func ConvertForkToNormalRepository(ctx context.Context, repo *repo_model.Reposit
 	})
 
 	return err
+}
+
+type findForksOptions struct {
+	db.ListOptions
+	RepoID int64
+	Doer   *user_model.User
+}
+
+func (opts findForksOptions) ToConds() builder.Cond {
+	return builder.Eq{"fork_id": opts.RepoID}.And(
+		repo_model.AccessibleRepositoryCondition(opts.Doer, unit.TypeInvalid),
+	)
+}
+
+// FindForks returns all the forks of the repository
+func FindForks(ctx context.Context, repo *repo_model.Repository, doer *user_model.User, listOptions db.ListOptions) ([]*repo_model.Repository, int64, error) {
+	return db.FindAndCount[repo_model.Repository](ctx, findForksOptions{
+		ListOptions: listOptions,
+		RepoID:      repo.ID,
+		Doer:        doer,
+	})
 }

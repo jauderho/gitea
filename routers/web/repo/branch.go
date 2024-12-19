@@ -16,14 +16,15 @@ import (
 	repo_model "code.gitea.io/gitea/models/repo"
 	"code.gitea.io/gitea/models/unit"
 	"code.gitea.io/gitea/modules/base"
-	"code.gitea.io/gitea/modules/context"
 	"code.gitea.io/gitea/modules/git"
 	"code.gitea.io/gitea/modules/log"
+	"code.gitea.io/gitea/modules/optional"
 	repo_module "code.gitea.io/gitea/modules/repository"
 	"code.gitea.io/gitea/modules/setting"
 	"code.gitea.io/gitea/modules/util"
 	"code.gitea.io/gitea/modules/web"
 	"code.gitea.io/gitea/routers/utils"
+	"code.gitea.io/gitea/services/context"
 	"code.gitea.io/gitea/services/forms"
 	release_service "code.gitea.io/gitea/services/release"
 	repo_service "code.gitea.io/gitea/services/repository"
@@ -53,7 +54,7 @@ func Branches(ctx *context.Context) {
 
 	kw := ctx.FormString("q")
 
-	defaultBranch, branches, branchesCount, err := repo_service.LoadBranches(ctx, ctx.Repo.Repository, ctx.Repo.GitRepo, util.OptionalBoolNone, kw, page, pageSize)
+	defaultBranch, branches, branchesCount, err := repo_service.LoadBranches(ctx, ctx.Repo.Repository, ctx.Repo.GitRepo, optional.None[bool](), kw, page, pageSize)
 	if err != nil {
 		ctx.ServerError("LoadBranches", err)
 		return
@@ -69,6 +70,11 @@ func Branches(ctx *context.Context) {
 		ctx.ServerError("LoadBranches", err)
 		return
 	}
+	if !ctx.Repo.CanRead(unit.TypeActions) {
+		for key := range commitStatuses {
+			git_model.CommitStatusesHideActionsURL(ctx, commitStatuses[key])
+		}
+	}
 
 	commitStatus := make(map[string]*git_model.CommitStatus)
 	for commitID, cs := range commitStatuses {
@@ -83,7 +89,6 @@ func Branches(ctx *context.Context) {
 	pager := context.NewPagination(int(branchesCount), pageSize, page, 5)
 	pager.SetDefaultParams(ctx)
 	ctx.Data["Page"] = pager
-
 	ctx.HTML(http.StatusOK, tplBranch)
 }
 
@@ -147,11 +152,13 @@ func RestoreBranchPost(ctx *context.Context) {
 		return
 	}
 
+	objectFormat := git.ObjectFormatFromName(ctx.Repo.Repository.ObjectFormatName)
+
 	// Don't return error below this
 	if err := repo_service.PushUpdate(
 		&repo_module.PushUpdateOptions{
 			RefFullName:  git.RefNameFromBranch(deletedBranch.Name),
-			OldCommitID:  git.EmptySHA,
+			OldCommitID:  objectFormat.EmptyObjectID().String(),
 			NewCommitID:  deletedBranch.CommitID,
 			PusherID:     ctx.Doer.ID,
 			PusherName:   ctx.Doer.Name,
@@ -191,9 +198,9 @@ func CreateBranch(ctx *context.Context) {
 		}
 		err = release_service.CreateNewTag(ctx, ctx.Doer, ctx.Repo.Repository, target, form.NewBranchName, "")
 	} else if ctx.Repo.IsViewBranch {
-		err = repo_service.CreateNewBranch(ctx, ctx.Doer, ctx.Repo.Repository, ctx.Repo.BranchName, form.NewBranchName)
+		err = repo_service.CreateNewBranch(ctx, ctx.Doer, ctx.Repo.Repository, ctx.Repo.GitRepo, ctx.Repo.BranchName, form.NewBranchName)
 	} else {
-		err = repo_service.CreateNewBranchFromCommit(ctx, ctx.Doer, ctx.Repo.Repository, ctx.Repo.CommitID, form.NewBranchName)
+		err = repo_service.CreateNewBranchFromCommit(ctx, ctx.Doer, ctx.Repo.Repository, ctx.Repo.GitRepo, ctx.Repo.CommitID, form.NewBranchName)
 	}
 	if err != nil {
 		if models.IsErrProtectedTagName(err) {
@@ -224,7 +231,7 @@ func CreateBranch(ctx *context.Context) {
 			if len(e.Message) == 0 {
 				ctx.Flash.Error(ctx.Tr("repo.editor.push_rejected_no_message"))
 			} else {
-				flashError, err := ctx.RenderToString(tplAlertDetails, map[string]any{
+				flashError, err := ctx.RenderToHTML(tplAlertDetails, map[string]any{
 					"Message": ctx.Tr("repo.editor.push_rejected"),
 					"Summary": ctx.Tr("repo.editor.push_rejected_summary"),
 					"Details": utils.SanitizeFlashErrorString(e.Message),
@@ -251,4 +258,21 @@ func CreateBranch(ctx *context.Context) {
 
 	ctx.Flash.Success(ctx.Tr("repo.branch.create_success", form.NewBranchName))
 	ctx.Redirect(ctx.Repo.RepoLink + "/src/branch/" + util.PathEscapeSegments(form.NewBranchName) + "/" + util.PathEscapeSegments(form.CurrentPath))
+}
+
+func MergeUpstream(ctx *context.Context) {
+	branchName := ctx.FormString("branch")
+	_, err := repo_service.MergeUpstream(ctx, ctx.Doer, ctx.Repo.Repository, branchName)
+	if err != nil {
+		if errors.Is(err, util.ErrNotExist) {
+			ctx.JSONError(ctx.Tr("error.not_found"))
+			return
+		} else if models.IsErrMergeConflicts(err) {
+			ctx.JSONError(ctx.Tr("repo.pulls.merge_conflict"))
+			return
+		}
+		ctx.ServerError("MergeUpstream", err)
+		return
+	}
+	ctx.JSONRedirect("")
 }

@@ -57,46 +57,19 @@ func (err ErrUserOwnPackages) Error() string {
 	return fmt.Sprintf("user still has ownership of packages [uid: %d]", err.UID)
 }
 
-// ErrNoPendingRepoTransfer is an error type for repositories without a pending
-// transfer request
-type ErrNoPendingRepoTransfer struct {
-	RepoID int64
+// ErrDeleteLastAdminUser represents a "DeleteLastAdminUser" kind of error.
+type ErrDeleteLastAdminUser struct {
+	UID int64
 }
 
-func (err ErrNoPendingRepoTransfer) Error() string {
-	return fmt.Sprintf("repository doesn't have a pending transfer [repo_id: %d]", err.RepoID)
-}
-
-// IsErrNoPendingTransfer is an error type when a repository has no pending
-// transfers
-func IsErrNoPendingTransfer(err error) bool {
-	_, ok := err.(ErrNoPendingRepoTransfer)
+// IsErrDeleteLastAdminUser checks if an error is a ErrDeleteLastAdminUser.
+func IsErrDeleteLastAdminUser(err error) bool {
+	_, ok := err.(ErrDeleteLastAdminUser)
 	return ok
 }
 
-func (err ErrNoPendingRepoTransfer) Unwrap() error {
-	return util.ErrNotExist
-}
-
-// ErrRepoTransferInProgress represents the state of a repository that has an
-// ongoing transfer
-type ErrRepoTransferInProgress struct {
-	Uname string
-	Name  string
-}
-
-// IsErrRepoTransferInProgress checks if an error is a ErrRepoTransferInProgress.
-func IsErrRepoTransferInProgress(err error) bool {
-	_, ok := err.(ErrRepoTransferInProgress)
-	return ok
-}
-
-func (err ErrRepoTransferInProgress) Error() string {
-	return fmt.Sprintf("repository is already being transferred [uname: %s, name: %s]", err.Uname, err.Name)
-}
-
-func (err ErrRepoTransferInProgress) Unwrap() error {
-	return util.ErrAlreadyExist
+func (err ErrDeleteLastAdminUser) Error() string {
+	return fmt.Sprintf("can not delete the last admin user [uid: %d]", err.UID)
 }
 
 // ErrInvalidCloneAddr represents a "InvalidCloneAddr" kind of error.
@@ -476,6 +449,23 @@ func IsErrMergeUnrelatedHistories(err error) bool {
 
 func (err ErrMergeUnrelatedHistories) Error() string {
 	return fmt.Sprintf("Merge UnrelatedHistories Error: %v: %s\n%s", err.Err, err.StdErr, err.StdOut)
+}
+
+// ErrMergeDivergingFastForwardOnly represents an error if a fast-forward-only merge fails because the branches diverge
+type ErrMergeDivergingFastForwardOnly struct {
+	StdOut string
+	StdErr string
+	Err    error
+}
+
+// IsErrMergeDivergingFastForwardOnly checks if an error is a ErrMergeDivergingFastForwardOnly.
+func IsErrMergeDivergingFastForwardOnly(err error) bool {
+	_, ok := err.(ErrMergeDivergingFastForwardOnly)
+	return ok
+}
+
+func (err ErrMergeDivergingFastForwardOnly) Error() string {
+	return fmt.Sprintf("Merge DivergingFastForwardOnly Error: %v: %s\n%s", err.Err, err.StdErr, err.StdOut)
 }
 
 // ErrRebaseConflicts represents an error if rebase fails with a conflict
